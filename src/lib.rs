@@ -1,3 +1,4 @@
+use bitvec::prelude::*;
 use std::{
     collections::BTreeMap,
     str,
@@ -7,6 +8,123 @@ const HP_SIGNATURE: u16 = 0xCF3;
 
 fn u16_from_bytes(low: u8, high: u8) -> u16 {
     (low as u16) | ((high as u16) << 8)
+}
+
+pub struct BitStream<'a> {
+    data: &'a [u8],
+    i: usize,
+}
+
+impl<'a> BitStream<'a> {
+    fn bit(&mut self) -> Option<bool> {
+        let bits = self.data.view_bits::<Lsb0>();
+        if self.i < bits.len() {
+            let value = bits[self.i];
+            self.i += 1;
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    fn bits(&mut self, count: usize) -> Option<u8> {
+        if count > 8 {
+            println!("BitStream::bits: requested too many bits: {}", count);
+            return None;
+        }
+
+        let bits = self.data.view_bits::<Lsb0>();
+        let end = self.i + count;
+        if end <= bits.len() {
+            let value = bits[self.i..end].load_le::<u8>();
+            self.i = end;
+            Some(value)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+struct Button {
+    id: u8,
+    host_id: u8,
+    press_type: u8,
+    action: Vec<u8>,
+}
+
+impl Button {
+    fn decode_action(&self) {
+        let mut bitstream = BitStream {
+            data: &self.action,
+            i: 0,
+        };
+
+        loop {
+            let op = match bitstream.bits(5) {
+                Some(some) => some,
+                None => {
+                    println!(" Failed to read OP");
+                    break;
+                }
+            };
+
+            println!("OP {}", op);
+            match op {
+                0 => {
+                    println!(" Finish");
+                    break;
+                }
+                24 => {
+                    println!(" Keyboard");
+
+                    let key_auto_release = match bitstream.bit() {
+                        Some(some) => some,
+                        None => {
+                            println!("  Failed to read key auto release");
+                            break;
+                        }
+                    };
+                    println!("  Auto release: {}", key_auto_release);
+
+                    let mut payload = Vec::new();
+                    loop {
+                        let bytes = match bitstream.bits(2) {
+                            Some(kind) => match kind {
+                                0 => break,
+                                //TODO: 1, using "math variables"
+                                2 => 1,
+                                3 => 2,
+                                _ => {
+                                    println!("  Unsupported payload kind {}", kind);
+                                    break;
+                                }
+                            }
+                            None => {
+                                println!("  Failed to read payload kind");
+                                break;
+                            }
+                        };
+
+                        for byte in 0..bytes {
+                            match bitstream.bits(8) {
+                                Some(byte) => payload.push(byte),
+                                None => {
+                                    println!("  Failed to read payload byte");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    println!("  Payload: {:#x?}", payload);
+                },
+                _ => {
+                    println!(" Unsupported OP");
+                    break;
+                }
+            }
+        }
+    }
 }
 
 pub struct HpMouse {
@@ -107,14 +225,6 @@ impl HpMouse {
         println!(" host id: {}", host_id);
         println!(" flags: {:#x}", flags);
 
-        #[derive(Debug)]
-        struct Button {
-            id: u8,
-            host_id: u8,
-            press_type: u8,
-            action: Vec<u8>,
-        }
-
         let mut buttons = Vec::with_capacity(programmed_buttons as usize);
         let mut i = 5;
         while buttons.len() < programmed_buttons as usize {
@@ -141,6 +251,7 @@ impl HpMouse {
 
         for button in buttons.iter() {
             println!("{:#x?}", button);
+            button.decode_action();
         }
 
         None
