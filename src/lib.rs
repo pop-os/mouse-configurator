@@ -78,14 +78,57 @@ impl Button {
                 24 => {
                     println!(" Keyboard");
 
-                    let key_auto_release = match bitstream.bit() {
+                    let auto_release = match bitstream.bit() {
                         Some(some) => some,
                         None => {
                             println!("  Failed to read key auto release");
                             break;
                         }
                     };
-                    println!("  Auto release: {}", key_auto_release);
+                    println!("  Auto release: {}", auto_release);
+
+                    let mut payload = Vec::new();
+                    loop {
+                        let bytes = match bitstream.bits(2) {
+                            Some(kind) => match kind {
+                                0 => break,
+                                //TODO: 1, using "math variables"
+                                2 => 1,
+                                3 => 2,
+                                _ => {
+                                    println!("  Unsupported payload kind {}", kind);
+                                    break;
+                                }
+                            }
+                            None => {
+                                println!("  Failed to read payload kind");
+                                break;
+                            }
+                        };
+
+                        for byte in 0..bytes {
+                            match bitstream.bits(8) {
+                                Some(byte) => payload.push(byte),
+                                None => {
+                                    println!("  Failed to read payload byte");
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    println!("  Payload: {:#x?}", payload);
+                },
+                27 => {
+                    println!(" Media");
+                    
+                    let auto_release = match bitstream.bit() {
+                        Some(some) => some,
+                        None => {
+                            println!("  Failed to read key auto release");
+                            break;
+                        }
+                    };
+                    println!("  Auto release: {}", auto_release);
 
                     let mut payload = Vec::new();
                     loop {
