@@ -3,6 +3,10 @@ name = "hp-mouse-configurator"
 version = "0.1.0"
 edition = "2021"
 
+[dependencies]
+gtk4 = "0.4"
+relm4 = { version =  "0.4", features = ["macros"] }
+
 [dependencies.bitvec]
 version = "1"
 default-features = false
