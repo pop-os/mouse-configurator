@@ -1,8 +1,5 @@
 use bitvec::prelude::*;
-use std::{
-    collections::BTreeMap,
-    str,
-};
+use std::{collections::BTreeMap, str};
 
 const HP_SIGNATURE: u16 = 0xCF3;
 
@@ -46,7 +43,7 @@ impl<'a> BitStream<'a> {
 }
 
 #[derive(Debug)]
-struct Button {
+pub struct Button {
     id: u8,
     host_id: u8,
     press_type: u8,
@@ -99,7 +96,7 @@ impl Button {
                                     println!("  Unsupported payload kind {}", kind);
                                     break;
                                 }
-                            }
+                            },
                             None => {
                                 println!("  Failed to read payload kind");
                                 break;
@@ -117,10 +114,10 @@ impl Button {
                         }
                     }
                     println!("  Payload: {:#x?}", payload);
-                },
+                }
                 27 => {
                     println!(" Media");
-                    
+
                     let auto_release = match bitstream.bit() {
                         Some(some) => some,
                         None => {
@@ -142,7 +139,7 @@ impl Button {
                                     println!("  Unsupported payload kind {}", kind);
                                     break;
                                 }
-                            }
+                            },
                             None => {
                                 println!("  Failed to read payload kind");
                                 break;
@@ -160,7 +157,7 @@ impl Button {
                         }
                     }
                     println!("  Payload: {:#x?}", payload);
-                },
+                }
                 _ => {
                     println!(" Unsupported OP");
                     break;
@@ -168,6 +165,35 @@ impl Button {
             }
         }
     }
+}
+
+#[derive(Debug)]
+pub enum Event {
+    Firmware {
+        version: (u16, u16, u16),
+        device: String,
+        serial: String,
+    },
+    Battery {
+        low_level: u8,
+        crit_level: u8,
+        power_off_timeout: u8,
+        auto_report_delay: u8,
+        level: u8,
+    },
+    Buttons {
+        total_buttons: u8,
+        programmed_buttons: u8,
+        host_id: u8,
+        flags: u8, // XXX Hex?
+        buttons: Vec<Button>,
+    },
+    Mouse {
+        max_dpi: u16,
+        min_dpi: u16,
+        dpi: u16,
+        step_dpi: u16,
+    },
 }
 
 pub struct HpMouse {
@@ -183,7 +209,7 @@ impl HpMouse {
         }
     }
 
-    fn report_1_packet_1(&mut self, data: &[u8]) -> Option<()> {
+    fn report_1_packet_1(&mut self, data: &[u8]) -> Option<Event> {
         println!("Update {}", data.len());
 
         if data.len() <= 3 {
@@ -195,12 +221,6 @@ impl HpMouse {
         let major_version = firmware_version / 1000;
         let minor_version = (firmware_version % 1000) / 10;
         let patch_version = firmware_version % 10;
-        println!(
-            " firmware version {}.{}.{}",
-            major_version,
-            minor_version,
-            patch_version
-        );
 
         let mut items = Vec::with_capacity(2);
         let mut i = 4;
@@ -216,15 +236,17 @@ impl HpMouse {
             items.push(item);
         }
 
-        println!(" device: {:?}", items.get(0).map(|x| str::from_utf8(x)));
-        println!(" serial: {:?}", items.get(1).map(|x| str::from_utf8(x)));
+        let device = str::from_utf8(items.get(0)?).ok()?;
+        let serial = str::from_utf8(items.get(1)?).ok()?;
 
-        None
+        Some(Event::Firmware {
+            version: (major_version, minor_version, patch_version),
+            device: device.to_string(),
+            serial: serial.to_string(),
+        })
     }
 
-    fn report_1_packet_6(&mut self, data: &[u8]) -> Option<()> {
-        println!("Update battery {}", data.len());
-
+    fn report_1_packet_6(&mut self, data: &[u8]) -> Option<Event> {
         if data.len() <= 4 {
             // Buffer too small
             return None;
@@ -236,18 +258,16 @@ impl HpMouse {
         let auto_report_delay = data[3];
         let level = data[4];
 
-        println!(" low level: {}", low_level);
-        println!(" critical level: {}", crit_level);
-        println!(" power off timeout: {}", power_off_timeout);
-        println!(" auto report delay: {}", auto_report_delay);
-        println!(" level: {}", level);
-
-        None
+        Some(Event::Battery {
+            low_level,
+            crit_level,
+            power_off_timeout,
+            auto_report_delay,
+            level,
+        })
     }
 
-    fn report_1_packet_14(&mut self, data: &[u8]) -> Option<()> {
-        println!("Update buttons {}", data.len());
-
+    fn report_1_packet_14(&mut self, data: &[u8]) -> Option<Event> {
         if data.get(0) != Some(&0) {
             // Wrong command
             return None;
@@ -262,11 +282,6 @@ impl HpMouse {
         let programmed_buttons = data[2];
         let host_id = data[3];
         let flags = data[4];
-
-        println!(" total buttons: {}", total_buttons);
-        println!(" programmed_buttons: {}", programmed_buttons);
-        println!(" host id: {}", host_id);
-        println!(" flags: {:#x}", flags);
 
         let mut buttons = Vec::with_capacity(programmed_buttons as usize);
         let mut i = 5;
@@ -293,16 +308,19 @@ impl HpMouse {
         }
 
         for button in buttons.iter() {
-            println!("{:#x?}", button);
             button.decode_action();
         }
 
-        None
+        Some(Event::Buttons {
+            total_buttons,
+            programmed_buttons,
+            host_id,
+            flags,
+            buttons,
+        })
     }
 
-    fn report_1_packet_18(&mut self, data: &[u8]) -> Option<()> {
-        println!("Update mouse {}", data.len());
-
+    fn report_1_packet_18(&mut self, data: &[u8]) -> Option<Event> {
         if data.get(0) != Some(&0) {
             // Wrong command
             return None;
@@ -319,15 +337,15 @@ impl HpMouse {
         let step_dpi = u16_from_bytes(data[7], data[8]);
         //TODO: more settings
 
-        println!(" max dpi: {}", max_dpi);
-        println!(" min dpi: {}", min_dpi);
-        println!(" dpi: {}", dpi);
-        println!(" step dpi: {}", step_dpi);
-
-        None
+        Some(Event::Mouse {
+            max_dpi,
+            min_dpi,
+            dpi,
+            step_dpi,
+        })
     }
 
-    fn report_1(&mut self, data: &[u8]) -> Option<()> {
+    fn report_1(&mut self, data: &[u8]) -> Option<Event> {
         if data.len() <= 3 {
             // Buffer too small
             return None;
@@ -341,10 +359,7 @@ impl HpMouse {
         let kind_opt = signature.checked_sub(HP_SIGNATURE);
         println!(
             " signature {:04X} {:?} length {} sequence {}",
-            signature,
-            kind_opt,
-            length,
-            sequence
+            signature, kind_opt, length, sequence
         );
 
         // Ensure signature is valid and can be converted to a packet kind
@@ -354,10 +369,7 @@ impl HpMouse {
 
         // Insert new incoming packet if sequence is 0, assert that there is no current one
         if sequence == 0 {
-            assert_eq!(
-                self.incoming.insert(kind, Vec::with_capacity(length)),
-                None
-            );
+            assert_eq!(self.incoming.insert(kind, Vec::with_capacity(length)), None);
         }
 
         // Get current incoming packet, assert that it exists
@@ -415,7 +427,7 @@ impl HpMouse {
         Ok(())
     }
 
-    pub fn read(&mut self) -> hidapi::HidResult<Option<()>> {
+    pub fn read(&mut self) -> hidapi::HidResult<Option<Event>> {
         let mut buf = [0; 4096];
         let len = self.dev.read(&mut buf)?;
         eprintln!("HID read {}", len);

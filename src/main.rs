@@ -16,37 +16,37 @@ fn hp_mouse(mut mouse: HpMouse) {
         let crit_level = 0xFF; // do not set
         let power_off_timeout = 0xFF; // do not set
         let auto_report_delay = 0x06; // 60 seconds
-        mouse.write_report_1(5, &[
-            low_level,
-            crit_level,
-            power_off_timeout,
-            auto_report_delay,
-        ]).unwrap();
+        mouse
+            .write_report_1(
+                5,
+                &[low_level, crit_level, power_off_timeout, auto_report_delay],
+            )
+            .unwrap();
     }
 
     // Send query for button info
     {
         let command = 0; // request status command
         let host_id = 0; // current host
-        mouse.write_report_1(13, &[
-            command,
-            host_id,
-        ]).unwrap();
+        mouse.write_report_1(13, &[command, host_id]).unwrap();
     }
 
     // Send query for DPI info
     {
         let host_id = 0; // current host
         let command = 4; // request status command, no save to flash not set
-        mouse.write_report_1(17, &[
-            host_id,
-            command,
-            0, 0, // payload
-        ]).unwrap();
+        mouse
+            .write_report_1(
+                17,
+                &[
+                    host_id, command, 0, 0, // payload
+                ],
+            )
+            .unwrap();
     }
 
     loop {
-        mouse.read().unwrap();
+        println!("{:?}", mouse.read().unwrap());
     }
 }
 
@@ -70,7 +70,7 @@ fn main() {
                             Err(err) => {
                                 eprintln!("failed to open HP mouse: {}", err);
                             }
-                        }
+                        },
                         _ => (),
                     },
                     (HP_VENDOR_ID, USB_PRODUCT_ID) => match (info.usage_page(), info.usage()) {
@@ -79,15 +79,15 @@ fn main() {
                             Err(err) => {
                                 eprintln!("failed to open HP mouse: {}", err);
                             }
-                        }
+                        },
                         _ => (),
                     },
                     _ => (),
                 }
             }
-        },
+        }
         Err(err) => {
             eprintln!("failed to list HID devices: {}", err);
-        },
+        }
     }
 }
