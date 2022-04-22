@@ -6,12 +6,8 @@ edition = "2021"
 [dependencies]
 gtk4 = "0.4"
 relm4 = { version =  "0.4", features = ["macros"] }
+udev = "0.6"
 
 [dependencies.bitvec]
 version = "1"
 default-features = false
-
-[dependencies.hidapi]
-version = "1.3.4"
-default-features = false
-features = ["linux-static-hidraw"]

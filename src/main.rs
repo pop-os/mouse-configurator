@@ -1,3 +1,5 @@
+use std::fs::File;
+
 use hp_mouse_configurator::HpMouse;
 
 const HP_VENDOR_ID: u16 = 0x03F0;
@@ -50,44 +52,50 @@ fn hp_mouse(mut mouse: HpMouse) {
     }
 }
 
+fn parse_hid_id(id: &str) -> Option<(u16, u16)> {
+    let mut iter = id.split(':');
+    let _ = iter.next()?;
+    let vendor_id = u16::from_str_radix(iter.next()?, 16).ok()?;
+    let product_id = u16::from_str_radix(iter.next()?, 16).ok()?;
+    Some((vendor_id, product_id))
+}
+
 fn main() {
-    match hidapi::HidApi::new() {
-        Ok(api) => {
-            for info in api.device_list() {
-                println!(
-                    "ID {:04x}:{:04x} IF {} USAGE {:04x}:{:04x}",
-                    info.vendor_id(),
-                    info.product_id(),
-                    info.interface_number(),
-                    info.usage_page(),
-                    info.usage()
-                );
-                match (info.vendor_id(), info.product_id()) {
-                    //TODO: also support HP mouse via bluetooth
-                    (HP_VENDOR_ID, BT_PRODUCT_ID) => match (info.usage_page(), info.usage()) {
-                        (0xFF00, 0x0001) => match info.open_device(&api) {
-                            Ok(ok) => hp_mouse(HpMouse::new(ok)),
-                            Err(err) => {
-                                eprintln!("failed to open HP mouse: {}", err);
-                            }
-                        },
-                        _ => (),
-                    },
-                    (HP_VENDOR_ID, USB_PRODUCT_ID) => match (info.usage_page(), info.usage()) {
-                        (0xFF00, 0x0001) => match info.open_device(&api) {
-                            Ok(ok) => hp_mouse(HpMouse::new(ok)),
-                            Err(err) => {
-                                eprintln!("failed to open HP mouse: {}", err);
-                            }
-                        },
-                        _ => (),
-                    },
-                    _ => (),
+    let mut enumerator = udev::Enumerator::new().unwrap();
+    enumerator.match_subsystem("hidraw").unwrap();
+    for device in enumerator.scan_devices().unwrap() {
+        let hid_device = match device.parent_with_subsystem("hid").unwrap() {
+            Some(dev) => dev,
+            None => { continue; }
+        };
+        let (vendor_id, product_id) = match hid_device.property_value("HID_ID").and_then(|x| parse_hid_id(x.to_str()?)) {
+            Some(id) => id,
+            None => { continue; }
+        };
+        let devnode = match device.devnode() {
+            Some(devnode) => devnode,
+            None => { continue; }
+        };
+        println!(
+            "ID {:04x}:{:04x}",
+            vendor_id,
+            product_id,
+        );
+        match (vendor_id, product_id) {
+            //TODO: also support HP mouse via bluetooth
+            (HP_VENDOR_ID, USB_PRODUCT_ID | BT_PRODUCT_ID) => match File::options().read(true).write(true).open(devnode) {
+                Ok(ok) => hp_mouse(HpMouse::new(ok)),
+                Err(err) => {
+                    eprintln!("failed to open HP mouse: {}", err);
                 }
-            }
+            },
+            _ => (),
         }
+    }
+    /*
         Err(err) => {
             eprintln!("failed to list HID devices: {}", err);
         }
     }
+    */
 }

@@ -1,5 +1,5 @@
 use bitvec::prelude::*;
-use std::{mem, str};
+use std::{fs::File, io::{self, Read, Write}, mem, str};
 
 const HP_SIGNATURE: u16 = 0xCF3;
 
@@ -220,13 +220,13 @@ pub enum Event {
 }
 
 pub struct HpMouse {
-    pub dev: hidapi::HidDevice,
+    pub dev: File,
     incoming: Vec<u8>,
     header: Header,
 }
 
 impl HpMouse {
-    pub fn new(dev: hidapi::HidDevice) -> Self {
+    pub fn new(dev: File) -> Self {
         Self {
             dev,
             incoming: Vec::new(),
@@ -417,7 +417,7 @@ impl HpMouse {
     }
 
     //TODO: support multi report packets
-    pub fn write_report_1(&mut self, kind: u16, packet: &[u8]) -> hidapi::HidResult<()> {
+    pub fn write_report_1(&mut self, kind: u16, packet: &[u8]) -> io::Result<()> {
         let report = 1;
         let signature = HP_SIGNATURE + kind;
         assert_eq!(signature & 0xF000, 0);
@@ -443,7 +443,7 @@ impl HpMouse {
         Ok(())
     }
 
-    pub fn read(&mut self) -> hidapi::HidResult<Option<Event>> {
+    pub fn read(&mut self) -> io::Result<Option<Event>> {
         let mut buf = [0; 4096];
         let len = self.dev.read(&mut buf)?;
         eprintln!("HID read {}", len);
