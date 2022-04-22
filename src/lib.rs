@@ -1,10 +1,10 @@
 use bitvec::prelude::*;
-use std::{collections::BTreeMap, str};
+use std::{mem, str};
 
 const HP_SIGNATURE: u16 = 0xCF3;
 
 fn u16_from_bytes(low: u8, high: u8) -> u16 {
-    (low as u16) | ((high as u16) << 8)
+    u16::from_le_bytes([low, high])
 }
 
 pub struct BitStream<'a> {
@@ -39,6 +39,29 @@ impl<'a> BitStream<'a> {
         } else {
             None
         }
+    }
+}
+
+#[derive(Default, Clone, Copy)]
+struct Header {
+    signature: u16,
+    composit_device: u8,
+    length: usize,
+    sequence: u8,
+}
+
+impl Header {
+    fn new(data: &[u8]) -> Option<Self> {
+        Some(Self {
+            signature: u16_from_bytes(*data.get(0)?, *data.get(1)? & 0b1111),
+            composit_device: (data.get(1)? >> 4) & 0b1111,
+            length: u16_from_bytes(*data.get(2)?, *data.get(3)? & 0b11) as usize,
+            sequence: (*data.get(3)? >> 2) & 0b111111,
+        })
+    }
+
+    fn kind(&self) -> Option<u16> {
+        self.signature.checked_sub(HP_SIGNATURE)
     }
 }
 
@@ -198,14 +221,16 @@ pub enum Event {
 
 pub struct HpMouse {
     pub dev: hidapi::HidDevice,
-    incoming: BTreeMap<u16, Vec<u8>>,
+    incoming: Vec<u8>,
+    header: Header,
 }
 
 impl HpMouse {
     pub fn new(dev: hidapi::HidDevice) -> Self {
         Self {
             dev,
-            incoming: BTreeMap::new(),
+            incoming: Vec::new(),
+            header: Header::default(),
         }
     }
 
@@ -346,20 +371,12 @@ impl HpMouse {
     }
 
     fn report_1(&mut self, data: &[u8]) -> Option<Event> {
-        if data.len() <= 3 {
-            // Buffer too small
-            return None;
-        }
+        let header = Header::new(data)?;
 
-        let signature = u16_from_bytes(data[0], data[1] & 0b1111);
-        let composit_device = (data[1] >> 4) & 0b1111;
-        let length = u16_from_bytes(data[2], data[3] & 0b11) as usize;
-        let sequence = (data[3] >> 2) & 0b111111;
-
-        let kind_opt = signature.checked_sub(HP_SIGNATURE);
+        let kind_opt = header.kind();
         println!(
             " signature {:04X} {:?} length {} sequence {}",
-            signature, kind_opt, length, sequence
+            header.signature, kind_opt, header.length, header.sequence
         );
 
         // Ensure signature is valid and can be converted to a packet kind
@@ -368,22 +385,24 @@ impl HpMouse {
         //TODO: replace asserts with errors
 
         // Insert new incoming packet if sequence is 0, assert that there is no current one
-        if sequence == 0 {
-            assert_eq!(self.incoming.insert(kind, Vec::with_capacity(length)), None);
+        if header.sequence == 0 {
+            assert_eq!(self.incoming.len(), 0);
+            self.header = header;
+        // Get current incoming packet, assert that it exists
+        } else {
+            assert_eq!(header.signature, self.header.signature);
+            assert_eq!(header.length, self.header.length);
+            assert_eq!(header.sequence, self.header.sequence + 1);
+            self.header.sequence += 1;
         }
 
-        // Get current incoming packet, assert that it exists
-        let mut incoming = self.incoming.remove(&kind).unwrap();
-
-        // Assert that incoming packet capacity is equal to requested length
-        assert_eq!(incoming.capacity(), length);
-
         // Push back new data
-        incoming.extend_from_slice(&data[4..]);
+        self.incoming.extend_from_slice(&data[4..]);
 
         // If we received enough data, truncate and return
-        if incoming.len() >= length {
-            incoming.truncate(length);
+        if self.incoming.len() >= header.length {
+            let mut incoming = mem::take(&mut self.incoming);
+            incoming.truncate(header.length);
             return match kind {
                 1 => self.report_1_packet_1(&incoming),
                 6 => self.report_1_packet_6(&incoming),
@@ -392,9 +411,6 @@ impl HpMouse {
                 _ => None,
             };
         }
-
-        // Re-add incoming packet, ensuring no other packet is overwritten
-        assert_eq!(self.incoming.insert(kind, incoming), None);
 
         // No full packet yet
         None
