@@ -1,5 +1,5 @@
 use gtk4::{pango, prelude::*};
-use relm4::{AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets};
+use relm4::{send, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets};
 
 use hp_mouse_configurator::Event;
 
@@ -27,13 +27,14 @@ struct AppComponents {
 #[derive(Default)]
 struct AppModel {
     battery_percent: u8,
-    sensitivity: f64,
+    sensitivity: Option<f64>,
 }
 
 enum AppMsg {
     SetSensitivity(f64),
     RenameConfig,
     Event(Event),
+    SetDpi(f64),
 }
 
 impl Model for AppModel {
@@ -43,19 +44,24 @@ impl Model for AppModel {
 }
 
 impl AppUpdate for AppModel {
-    fn update(
-        &mut self,
-        msg: AppMsg,
-        _components: &AppComponents,
-        _sender: Sender<AppMsg>,
-    ) -> bool {
+    fn update(&mut self, msg: AppMsg, components: &AppComponents, _sender: Sender<AppMsg>) -> bool {
         match msg {
             AppMsg::SetSensitivity(sensitivity) => {}
             AppMsg::RenameConfig => {}
             AppMsg::Event(event) => match event {
                 Event::Battery { level, .. } => self.battery_percent = level,
+                Event::Mouse { dpi, .. } => {
+                    if self.sensitivity.is_none() {
+                        self.sensitivity = Some(dpi.into());
+                    }
+                }
                 _ => {}
             },
+            AppMsg::SetDpi(value) => {
+                // XXX don't queue infinitely?
+                send!(components.worker, WorkerMsg::SetDpi(value as u16));
+                self.sensitivity = Some(value);
+            }
         }
         true
     }
@@ -135,6 +141,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     append = &gtk4::ListBox {
                         add_css_class: "frame",
                         append = &gtk4::ListBoxRow {
+                            set_sensitive: watch! { model.sensitivity.is_some() },
                             set_selectable: false,
                             set_activatable: false,
                             set_child = Some(&gtk4::Box) {
@@ -154,6 +161,11 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                 append = &gtk4::Scale {
                                     set_hexpand: true,
                                     set_adjustment: &gtk4::Adjustment::new(500., 500., 3000., 1., 1., 1.), // XXX don't hard-code?
+                                    set_value: watch! { model.sensitivity.unwrap_or(0.) },
+                                    connect_change_value(sender) => move |_, _, value| {
+                                        send!(sender, AppMsg::SetDpi(value));
+                                        gtk4::Inhibit(false)
+                                    }
                                     // add_mark(0., gtk4::PositionType::Bottom, 0.),
                                 }
                             }

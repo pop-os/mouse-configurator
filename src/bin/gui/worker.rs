@@ -6,6 +6,7 @@ use hp_mouse_configurator::{enumerate, HpMouse};
 
 pub enum WorkerMsg {
     DetectDevice,
+    SetDpi(u16),
 }
 
 pub struct WorkerModel {
@@ -60,6 +61,14 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
                             // XXX handle error
                         }
                     });
+
+                    self.mouse = Some(mouse);
+                }
+            }
+            WorkerMsg::SetDpi(value) => {
+                if let Some(mouse) = &self.mouse {
+                    // XXX error
+                    let _ = mouse.set_dpi(value);
                 }
             }
         }

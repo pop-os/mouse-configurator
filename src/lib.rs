@@ -244,6 +244,13 @@ impl HpMouse {
         )
     }
 
+    pub fn set_dpi(&self, dpi: u16) -> io::Result<()> {
+        let host_id = 0; // current host
+        let command = 0; // set dpi
+        let dpi = dpi.to_le_bytes();
+        self.write_report_1(17, &[host_id, command, dpi[0], dpi[1]])
+    }
+
     // Using multiple readers will result in inconsistent behavior
     pub fn read(&self) -> HpMouseEventIterator {
         HpMouseEventIterator::new(self.dev.clone())
