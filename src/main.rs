@@ -1,10 +1,6 @@
 use std::fs::File;
 
-use hp_mouse_configurator::HpMouse;
-
-const HP_VENDOR_ID: u16 = 0x03F0;
-const BT_PRODUCT_ID: u16 = 0x524A;
-const USB_PRODUCT_ID: u16 = 0x544A;
+use hp_mouse_configurator::{enumerate, HpMouse};
 
 fn hp_mouse(mut mouse: HpMouse) {
     println!("Found HP mouse");
@@ -52,58 +48,17 @@ fn hp_mouse(mut mouse: HpMouse) {
     }
 }
 
-fn parse_hid_id(id: &str) -> Option<(u16, u16)> {
-    let mut iter = id.split(':');
-    let _ = iter.next()?;
-    let vendor_id = u16::from_str_radix(iter.next()?, 16).ok()?;
-    let product_id = u16::from_str_radix(iter.next()?, 16).ok()?;
-    Some((vendor_id, product_id))
-}
-
-fn get_interface_number(device: &udev::Device) -> Option<i32> {
-    let interface = device.parent_with_subsystem_devtype("usb", "usb_interface").ok()??;
-    interface.attribute_value("bInterfaceNumber")?.to_str()?.parse().ok()
-}
-
 fn main() {
-    let mut enumerator = udev::Enumerator::new().unwrap();
-    enumerator.match_subsystem("hidraw").unwrap();
-    for device in enumerator.scan_devices().unwrap() {
-        let hid_device = match device.parent_with_subsystem("hid").unwrap() {
-            Some(dev) => dev,
-            None => { continue; }
-        };
-        let (vendor_id, product_id) = match hid_device.property_value("HID_ID").and_then(|x| parse_hid_id(x.to_str()?)) {
-            Some(id) => id,
-            None => { continue; }
-        };
-        let interface = get_interface_number(&device);
-        let devnode = match device.devnode() {
-            Some(devnode) => devnode,
-            None => { continue; }
-        };
-        println!(
-            "ID {:04x}:{:04x} INTERFACE {:?}",
-            vendor_id,
-            product_id,
-            interface,
-        );
-        match (vendor_id, product_id, interface) {
-            (HP_VENDOR_ID, USB_PRODUCT_ID, Some(1)) | (HP_VENDOR_ID, BT_PRODUCT_ID, _) => {
-                match File::options().read(true).write(true).open(devnode) {
-                    Ok(ok) => hp_mouse(HpMouse::new(ok)),
-                    Err(err) => {
-                        eprintln!("failed to open HP mouse: {}", err);
-                    }
+    match enumerate() {
+        Ok(devices) => {
+            for device in devices {
+                println!("{:?}", device);
+                match device.open() {
+                    Ok(mouse) => hp_mouse(mouse),
+                    Err(err) => eprintln!("failed to open HP mouse: {}", err),
                 }
-            },
-            _ => (),
+            }
         }
+        Err(err) => eprintln!("failed to list HID devices: {}", err),
     }
-    /*
-        Err(err) => {
-            eprintln!("failed to list HID devices: {}", err);
-        }
-    }
-    */
 }

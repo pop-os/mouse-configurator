@@ -1,5 +1,14 @@
 use bitvec::prelude::*;
-use std::{fs::File, io::{self, Read, Write}, mem, str};
+use std::{
+    fs::File,
+    io::{self, Read, Write},
+    mem,
+    path::Path,
+    str,
+};
+
+mod enumerate;
+pub use enumerate::enumerate;
 
 const HP_SIGNATURE: u16 = 0xCF3;
 
@@ -226,12 +235,13 @@ pub struct HpMouse {
 }
 
 impl HpMouse {
-    pub fn new(dev: File) -> Self {
-        Self {
+    pub fn open_devnode(path: &Path) -> io::Result<Self> {
+        let dev = File::options().read(true).write(true).open(path)?;
+        Ok(Self {
             dev,
             incoming: Vec::new(),
             header: Header::default(),
-        }
+        })
     }
 
     fn report_1_packet_1(&mut self, data: &[u8]) -> Option<Event> {
