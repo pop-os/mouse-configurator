@@ -60,6 +60,11 @@ fn parse_hid_id(id: &str) -> Option<(u16, u16)> {
     Some((vendor_id, product_id))
 }
 
+fn get_interface_number(device: &udev::Device) -> Option<i32> {
+    let interface = device.parent_with_subsystem_devtype("usb", "usb_interface").ok()??;
+    interface.attribute_value("bInterfaceNumber")?.to_str()?.parse().ok()
+}
+
 fn main() {
     let mut enumerator = udev::Enumerator::new().unwrap();
     enumerator.match_subsystem("hidraw").unwrap();
@@ -72,21 +77,24 @@ fn main() {
             Some(id) => id,
             None => { continue; }
         };
+        let interface = get_interface_number(&device);
         let devnode = match device.devnode() {
             Some(devnode) => devnode,
             None => { continue; }
         };
         println!(
-            "ID {:04x}:{:04x}",
+            "ID {:04x}:{:04x} INTERFACE {:?}",
             vendor_id,
             product_id,
+            interface,
         );
-        match (vendor_id, product_id) {
-            //TODO: also support HP mouse via bluetooth
-            (HP_VENDOR_ID, USB_PRODUCT_ID | BT_PRODUCT_ID) => match File::options().read(true).write(true).open(devnode) {
-                Ok(ok) => hp_mouse(HpMouse::new(ok)),
-                Err(err) => {
-                    eprintln!("failed to open HP mouse: {}", err);
+        match (vendor_id, product_id, interface) {
+            (HP_VENDOR_ID, USB_PRODUCT_ID, Some(1)) | (HP_VENDOR_ID, BT_PRODUCT_ID, _) => {
+                match File::options().read(true).write(true).open(devnode) {
+                    Ok(ok) => hp_mouse(HpMouse::new(ok)),
+                    Err(err) => {
+                        eprintln!("failed to open HP mouse: {}", err);
+                    }
                 }
             },
             _ => (),
