@@ -1,5 +1,3 @@
-use std::fs::File;
-
 use hp_mouse_configurator::{enumerate, HpMouse};
 
 fn hp_mouse(mut mouse: HpMouse) {
@@ -43,8 +41,8 @@ fn hp_mouse(mut mouse: HpMouse) {
             .unwrap();
     }
 
-    loop {
-        println!("{:?}", mouse.read().unwrap());
+    for event in mouse.read() {
+        println!("{:?}", event);
     }
 }
 

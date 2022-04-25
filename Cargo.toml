@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 gtk4 = "0.4"
+nix = "0.24"
 relm4 = { version =  "0.4", features = ["macros"] }
 udev = "0.6"
 
