@@ -1,7 +1,5 @@
-use gtk4::{pango, prelude::*};
-use relm4::{
-    send, AppUpdate, ComponentUpdate, Model, RelmApp, RelmComponent, Sender, WidgetPlus, Widgets,
-};
+use gtk4::prelude::*;
+use relm4::{ComponentUpdate, Model, Sender, Widgets};
 
 pub enum DialogMsg {
     Show(u8), // XXX button

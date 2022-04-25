@@ -1,15 +1,12 @@
 use gtk4::{pango, prelude::*};
-use relm4::{
-    send, AppUpdate, ComponentUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender,
-    WidgetPlus, Widgets,
-};
+use relm4::{AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets};
 
-use hp_mouse_configurator::HpMouse;
+use hp_mouse_configurator::Event;
 
 mod dialog;
 use dialog::DialogModel;
 mod worker;
-use worker::WorkerModel;
+use worker::{WorkerModel, WorkerMsg};
 
 struct Mouse {
     min_sensitivity: f64,
@@ -36,6 +33,7 @@ struct AppModel {
 enum AppMsg {
     SetSensitivity(f64),
     RenameConfig,
+    Event(Event),
 }
 
 impl Model for AppModel {
@@ -44,9 +42,6 @@ impl Model for AppModel {
     type Components = AppComponents;
 }
 
-// XXX does `update` handle sending commands to hardware? I think?
-// XXX How does it poll for changes to device state? I guess a background thread could send
-// signals. Async? Hidapi is synchronous.
 impl AppUpdate for AppModel {
     fn update(
         &mut self,
@@ -57,6 +52,10 @@ impl AppUpdate for AppModel {
         match msg {
             AppMsg::SetSensitivity(sensitivity) => {}
             AppMsg::RenameConfig => {}
+            AppMsg::Event(event) => match event {
+                Event::Battery { level, .. } => self.battery_percent = level,
+                _ => {}
+            },
         }
         true
     }
@@ -172,6 +171,10 @@ impl Widgets<AppModel, ()> for AppWidgets {
             "Export Configuration" => ExportConfig,
             "Reset to Default" => ResetConfig,
         }
+    }
+
+    fn post_init() {
+        let _ = components.worker.send(WorkerMsg::DetectDevice);
     }
 }
 

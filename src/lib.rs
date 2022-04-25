@@ -182,7 +182,7 @@ impl HpMouse {
     }
 
     //TODO: support multi report packets
-    pub fn write_report_1(&mut self, kind: u16, packet: &[u8]) -> io::Result<()> {
+    pub fn write_report_1(&self, kind: u16, packet: &[u8]) -> io::Result<()> {
         let report = 1;
         let signature = HP_SIGNATURE + kind;
         assert_eq!(signature & 0xF000, 0);
@@ -206,6 +206,42 @@ impl HpMouse {
         eprintln!();
 
         Ok(())
+    }
+
+    /// Send query for firmware info
+    pub fn query_firmware(&self) -> io::Result<()> {
+        self.write_report_1(0, &[])
+    }
+
+    /// Send query for battery info
+    pub fn query_battery(&self) -> io::Result<()> {
+        let low_level = 0xFF; // do not set
+        let crit_level = 0xFF; // do not set
+        let power_off_timeout = 0xFF; // do not set
+        let auto_report_delay = 0x06; // 60 seconds
+        self.write_report_1(
+            5,
+            &[low_level, crit_level, power_off_timeout, auto_report_delay],
+        )
+    }
+
+    /// Send query for button info
+    pub fn query_button(&self) -> io::Result<()> {
+        let command = 0; // request status command
+        let host_id = 0; // current host
+        self.write_report_1(13, &[command, host_id])
+    }
+
+    /// Send query for DPI info
+    pub fn query_dpi(&self) -> io::Result<()> {
+        let host_id = 0; // current host
+        let command = 4; // request status command, no save to flash not set
+        self.write_report_1(
+            17,
+            &[
+                host_id, command, 0, 0, // payload
+            ],
+        )
     }
 
     // Using multiple readers will result in inconsistent behavior

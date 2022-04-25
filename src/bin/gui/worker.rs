@@ -1,12 +1,16 @@
-use gtk4::{pango, prelude::*};
-use relm4::{
-    send, AppUpdate, ComponentUpdate, Model, RelmApp, RelmComponent, Sender, WidgetPlus, Widgets,
-};
+use relm4::{ComponentUpdate, Model, Sender};
+use std::thread;
 
-pub enum WorkerMsg {}
+use super::AppMsg;
+use hp_mouse_configurator::{enumerate, HpMouse};
 
-#[derive(Default)]
-pub struct WorkerModel;
+pub enum WorkerMsg {
+    DetectDevice,
+}
+
+pub struct WorkerModel {
+    mouse: Option<HpMouse>,
+}
 
 impl Model for WorkerModel {
     type Msg = WorkerMsg;
@@ -14,9 +18,17 @@ impl Model for WorkerModel {
     type Components = ();
 }
 
+fn detect_device() -> Option<HpMouse> {
+    for device in enumerate().ok()? {
+        eprintln!("Found device: {:?}", device);
+        return device.open().ok();
+    }
+    None
+}
+
 impl ComponentUpdate<super::AppModel> for WorkerModel {
     fn init_model(_parent_model: &super::AppModel) -> Self {
-        WorkerModel::default()
+        WorkerModel { mouse: None }
     }
 
     fn update(
@@ -24,8 +36,32 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
         msg: WorkerMsg,
         _components: &(),
         _sender: Sender<WorkerMsg>,
-        _parent_sender: Sender<super::AppMsg>,
+        parent_sender: Sender<super::AppMsg>,
     ) {
-        match msg {}
+        match msg {
+            WorkerMsg::DetectDevice => {
+                if let Some(mouse) = detect_device() {
+                    // XXX errors
+                    let _ = mouse.query_firmware();
+                    let _ = mouse.query_battery();
+                    let _ = mouse.query_button();
+                    let _ = mouse.query_dpi();
+
+                    let events = mouse.read();
+                    let parent_sender = parent_sender.clone();
+
+                    thread::spawn(move || {
+                        for event in events {
+                            if let Ok(event) = event {
+                                if let Err(_) = parent_sender.send(AppMsg::Event(event)) {
+                                    break;
+                                }
+                            }
+                            // XXX handle error
+                        }
+                    });
+                }
+            }
+        }
     }
 }

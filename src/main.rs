@@ -3,43 +3,10 @@ use hp_mouse_configurator::{enumerate, HpMouse};
 fn hp_mouse(mut mouse: HpMouse) {
     println!("Found HP mouse");
 
-    // Send query for normal info
-    mouse.write_report_1(0, &[]).unwrap();
-
-    // Send query for battery info
-    {
-        let low_level = 0xFF; // do not set
-        let crit_level = 0xFF; // do not set
-        let power_off_timeout = 0xFF; // do not set
-        let auto_report_delay = 0x06; // 60 seconds
-        mouse
-            .write_report_1(
-                5,
-                &[low_level, crit_level, power_off_timeout, auto_report_delay],
-            )
-            .unwrap();
-    }
-
-    // Send query for button info
-    {
-        let command = 0; // request status command
-        let host_id = 0; // current host
-        mouse.write_report_1(13, &[command, host_id]).unwrap();
-    }
-
-    // Send query for DPI info
-    {
-        let host_id = 0; // current host
-        let command = 4; // request status command, no save to flash not set
-        mouse
-            .write_report_1(
-                17,
-                &[
-                    host_id, command, 0, 0, // payload
-                ],
-            )
-            .unwrap();
-    }
+    mouse.query_firmware().unwrap();
+    mouse.query_battery().unwrap();
+    mouse.query_button().unwrap();
+    mouse.query_dpi().unwrap();
 
     for event in mouse.read() {
         println!("{:?}", event);
