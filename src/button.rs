@@ -100,7 +100,6 @@ fn get_value2(bitstream: &mut BitStream, signed: bool) -> Result<Value, &'static
         let byte = bitstream.bits(8).ok_or("Failed to read value byte")?;
         Ok(Value::Const(i32::from(byte as i8)))
     } else {
-        // XXX signed vs unsigned? Cast to i32.
         Ok(Value::Const(
             i16::from_le_bytes([
                 bitstream.bits(8).ok_or("Failed to read value byte")?,
