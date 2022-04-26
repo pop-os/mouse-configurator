@@ -1,4 +1,4 @@
-use std::{io, mem, str, sync::Arc};
+use std::{io, mem, num::NonZeroU8, str, sync::Arc};
 
 use crate::{Button, Hid, HP_SIGNATURE};
 
@@ -55,6 +55,16 @@ pub enum Event {
         min_dpi: u16,
         dpi: u16,
         step_dpi: u16,
+        nb_sensitivity_wheel1: Option<NonZeroU8>,
+        sensitivity_wheel1: u8,
+        nb_sensitivity_wheel2: Option<NonZeroU8>,
+        sensitivity_wheel2: u8,
+        host_id: u8,
+        cut_off_max: u8,
+        cut_off: u8,
+        support_left_handed: bool,
+        left_handed: bool,
+        support_no_save_to_flash: bool,
     },
 }
 
@@ -190,7 +200,7 @@ impl HpMouseEventIterator {
             return None;
         }
 
-        if data.len() <= 8 {
+        if data.len() <= 14 {
             // Buffer too small
             return None;
         }
@@ -199,13 +209,35 @@ impl HpMouseEventIterator {
         let min_dpi = u16_from_bytes(data[3], data[4]);
         let dpi = u16_from_bytes(data[5], data[6]);
         let step_dpi = u16_from_bytes(data[7], data[8]);
-        //TODO: more settings
+
+        let nb_sensitivity_wheel1 = NonZeroU8::new(data[9] & 0b1111);
+        let sensitivity_wheel1 = data[9] >> 4;
+        let nb_sensitivity_wheel2 = NonZeroU8::new(data[10] & 0b1111);
+        let sensitivity_wheel2 = data[10] >> 4;
+
+        let host_id = data[11];
+        let cut_off_max = data[12];
+        let cut_off = data[13];
+
+        let support_left_handed = (data[14] & 1) != 0;
+        let left_handed = (data[14] & (1 << 1)) != 0;
+        let support_no_save_to_flash = (data[14] & (1 << 2)) != 0;
 
         Some(Event::Mouse {
             max_dpi,
             min_dpi,
             dpi,
             step_dpi,
+            nb_sensitivity_wheel1,
+            sensitivity_wheel1,
+            nb_sensitivity_wheel2,
+            sensitivity_wheel2,
+            host_id,
+            cut_off_max,
+            cut_off,
+            support_left_handed,
+            left_handed,
+            support_no_save_to_flash,
         })
     }
 
