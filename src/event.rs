@@ -182,7 +182,7 @@ impl HpMouseEventIterator {
         }
 
         for button in buttons.iter() {
-            button.decode_action();
+            eprintln!("Action: {:?}", button.decode_action());
         }
 
         Some(Event::Buttons {

@@ -12,3 +12,4 @@ udev = "0.6"
 [dependencies.bitvec]
 version = "1"
 default-features = false
+features = ["std"]
