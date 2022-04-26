@@ -11,17 +11,20 @@ use hid::Hid;
 const HP_SIGNATURE: u16 = 0xCF3;
 
 pub struct BitStream<'a> {
-    data: &'a [u8],
-    i: usize,
+    bits: &'a BitSlice<u8, Lsb0>,
 }
 
 impl<'a> BitStream<'a> {
+    fn new(data: &'a [u8]) -> Self {
+        Self {
+            bits: data.view_bits(),
+        }
+    }
+
     fn bit(&mut self) -> Option<bool> {
-        let bits = self.data.view_bits::<Lsb0>();
-        if self.i < bits.len() {
-            let value = bits[self.i];
-            self.i += 1;
-            Some(value)
+        if let Some(value) = self.bits.get(0) {
+            self.bits = &self.bits[1..];
+            Some(*value)
         } else {
             None
         }
@@ -33,12 +36,9 @@ impl<'a> BitStream<'a> {
             return None;
         }
 
-        let bits = self.data.view_bits::<Lsb0>();
-        let end = self.i + count;
-        if end <= bits.len() {
-            let value = bits[self.i..end].load_le::<u8>();
-            self.i = end;
-            Some(value)
+        if let Some(bits) = self.bits.get(..count) {
+            self.bits = &self.bits[count..];
+            Some(bits.load_le::<u8>())
         } else {
             None
         }
@@ -55,10 +55,7 @@ pub struct Button {
 
 impl Button {
     fn decode_action(&self) {
-        let mut bitstream = BitStream {
-            data: &self.action,
-            i: 0,
-        };
+        let mut bitstream = BitStream::new(&self.action);
 
         loop {
             let op = match bitstream.bits(5) {
