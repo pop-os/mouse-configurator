@@ -1,3 +1,4 @@
+use bitvec::prelude::*;
 use std::{io, mem, num::NonZeroU8, str, sync::Arc};
 
 use crate::{Button, Hid, HP_SIGNATURE};
@@ -47,7 +48,11 @@ pub enum Event {
         total_buttons: u8,
         programmed_buttons: u8,
         host_id: u8,
-        flags: u8, // XXX Hex?
+        support_long_press: bool,
+        support_double_press: bool,
+        support_down_up_press: bool,
+        support_simulate: bool,
+        support_program_stop: bool,
         buttons: Vec<Button>,
     },
     Mouse {
@@ -155,7 +160,13 @@ impl HpMouseEventIterator {
         let total_buttons = data[1];
         let programmed_buttons = data[2];
         let host_id = data[3];
-        let flags = data[4];
+
+        let flags = data[4].view_bits::<Lsb0>();
+        let support_long_press = flags[0];
+        let support_double_press = flags[1];
+        let support_down_up_press = flags[2];
+        let support_simulate = flags[3];
+        let support_program_stop = flags[4];
 
         let mut buttons = Vec::with_capacity(programmed_buttons as usize);
         let mut i = 5;
@@ -189,7 +200,11 @@ impl HpMouseEventIterator {
             total_buttons,
             programmed_buttons,
             host_id,
-            flags,
+            support_long_press,
+            support_double_press,
+            support_down_up_press,
+            support_simulate,
+            support_program_stop,
             buttons,
         })
     }
@@ -219,9 +234,10 @@ impl HpMouseEventIterator {
         let cut_off_max = data[12];
         let cut_off = data[13];
 
-        let support_left_handed = (data[14] & 1) != 0;
-        let left_handed = (data[14] & (1 << 1)) != 0;
-        let support_no_save_to_flash = (data[14] & (1 << 2)) != 0;
+        let flags = data[14].view_bits::<Lsb0>();
+        let support_left_handed = flags[0];
+        let left_handed = flags[1];
+        let support_no_save_to_flash = flags[2];
 
         Some(Event::Mouse {
             max_dpi,
