@@ -42,7 +42,7 @@ impl<'a> BitStream<'a> {
 #[derive(Debug)]
 pub enum Value {
     Var(u8),
-    Const(u16),
+    Const(i32),
 }
 
 #[derive(Debug)]
@@ -72,16 +72,18 @@ fn get_payload(bitstream: &mut BitStream) -> Result<Vec<Value>, &'static str> {
                     break;
                 }
                 0b01 => Value::Var(bitstream.bits(4).ok_or("Failed to read payload nibble")?),
-                0b10 => Value::Const(
-                    bitstream
-                        .bits(8)
-                        .ok_or("Failed to read payload byte")?
-                        .into(),
+
+                0b10 => {
+                    let byte = bitstream.bits(8).ok_or("Failed to read payload byte")?;
+                    Value::Const(i32::from(byte as i8))
+                }
+                0b11 => Value::Const(
+                    i16::from_le_bytes([
+                        bitstream.bits(8).ok_or("Failed to read payload byte")?,
+                        bitstream.bits(8).ok_or("Failed to read payload byte")?,
+                    ])
+                    .into(),
                 ),
-                0b11 => Value::Const(u16::from_le_bytes([
-                    bitstream.bits(8).ok_or("Failed to read payload byte")?,
-                    bitstream.bits(8).ok_or("Failed to read payload byte")?,
-                ])),
                 _ => unreachable!(),
             },
         );
@@ -89,21 +91,23 @@ fn get_payload(bitstream: &mut BitStream) -> Result<Vec<Value>, &'static str> {
     Ok(values)
 }
 
-fn get_value2(bitstream: &mut BitStream) -> Result<Value, &'static str> {
+fn get_value2(bitstream: &mut BitStream, signed: bool) -> Result<Value, &'static str> {
     if !bitstream.bit().ok_or("Failed to read value bit")? {
         Ok(Value::Var(
             bitstream.bits(4).ok_or("Failed to read value nibble")?,
         ))
     } else if !bitstream.bit().ok_or("Failed to read value bit")? {
-        Ok(Value::Const(
-            bitstream.bits(8).ok_or("Failed to read value byte")?.into(),
-        ))
+        let byte = bitstream.bits(8).ok_or("Failed to read value byte")?;
+        Ok(Value::Const(i32::from(byte as i8)))
     } else {
         // XXX signed vs unsigned? Cast to i32.
-        Ok(Value::Const(u16::from_le_bytes([
-            bitstream.bits(8).ok_or("Failed to read value byte")?,
-            bitstream.bits(8).ok_or("Failed to read value byte")?,
-        ])))
+        Ok(Value::Const(
+            i16::from_le_bytes([
+                bitstream.bits(8).ok_or("Failed to read value byte")?,
+                bitstream.bits(8).ok_or("Failed to read value byte")?,
+            ])
+            .into(),
+        ))
     }
 }
 
@@ -161,7 +165,7 @@ impl Button {
                     break;
                 }
                 21 => {
-                    ops.push(Op::Pause(get_value2(&mut bitstream)?));
+                    ops.push(Op::Pause(get_value2(&mut bitstream, false)?));
                 }
                 23 => {
                     let auto_release = bitstream.bit().ok_or("Failed to read key auto release")?;
