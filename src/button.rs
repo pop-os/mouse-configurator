@@ -98,11 +98,11 @@ pub enum Op {
 }
 
 impl Op {
-    fn pause(value: impl Into<Value<i16>>) -> Self {
+    pub fn pause(value: impl Into<Value<i16>>) -> Self {
         Self::Pause(value.into())
     }
 
-    fn mouse(
+    pub fn mouse(
         auto_release: bool,
         buttons: impl Into<Value<i16>>,
         dx: impl Into<Value<i16>>,
@@ -120,15 +120,15 @@ impl Op {
         }
     }
 
-    fn key(auto_release: bool, payload: Vec<Value<i8>>) -> Self {
+    pub fn key(auto_release: bool, payload: Vec<Value<i8>>) -> Self {
         Self::Key {
             auto_release,
             payload,
         }
     }
 
-    fn media(auto_release: bool, payload: Vec<Value<i8>>) -> Self {
-        Self::Key {
+    pub fn media(auto_release: bool, payload: Vec<Value<i8>>) -> Self {
+        Self::Media {
             auto_release,
             payload: payload,
         }
@@ -375,6 +375,10 @@ pub fn decode_action(action: &[u8]) -> Result<Vec<Op>, String> {
         }
     }
 
+    if ops.last() == Some(&Op::Kill) {
+        ops.pop();
+    }
+
     Ok(ops)
 }
 
@@ -460,7 +464,7 @@ mod tests {
 
     #[test]
     fn test_pause() {
-        let pause = vec![Pause(Const(100)), Kill];
+        let pause = vec![Pause(Const(100))];
         assert_eq!(decode_action(&encode_action(&pause)).unwrap(), pause);
     }
 
@@ -488,5 +492,15 @@ mod tests {
         let zoom_out = zoom_out();
         let bytes = &[152, 1, 212, 200, 46, 1, 4, 16, 192, 127, 106, 100, 24];
         assert_eq!(decode_action(bytes).unwrap(), zoom_out);
+    }
+
+    #[test]
+    fn test_media_play_pause() {
+        #[allow(overflowing_literals)]
+        let play_pause = vec![Op::media(true, vec![Const(0xCD)])];
+        assert_eq!(
+            decode_action(&encode_action(&play_pause)).unwrap(),
+            play_pause
+        );
     }
 }

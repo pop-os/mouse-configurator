@@ -414,6 +414,7 @@ dependencies = [
  "bitvec",
  "gtk4",
  "nix",
+ "once_cell",
  "relm4",
  "udev",
 ]

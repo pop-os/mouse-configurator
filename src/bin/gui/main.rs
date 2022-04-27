@@ -24,7 +24,6 @@ static BUTTONS: &[(&str, u8)] = &[
     ("Forward", BUTTON_LEFT_TOP),
     ("Scroll Left", BUTTON_SCROLL_LEFT),
     ("Scroll Right", BUTTON_SCROLL_RIGHT),
-    ("Scroll Right", BUTTON_SCROLL_RIGHT),
     ("Super", BUTTON_LEFT_CENTER),
 ];
 
