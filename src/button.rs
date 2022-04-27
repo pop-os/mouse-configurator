@@ -118,6 +118,7 @@ fn get_payload2(bitstream: &mut BitStream) -> Result<Vec<Value<i16>>, &'static s
     Ok(values)
 }
 
+// XXX signed
 fn get_value2(bitstream: &mut BitStream, signed: bool) -> Result<Value<i16>, &'static str> {
     if !bitstream.bit().ok_or("Failed to read value bit")? {
         Ok(Value::Var(
@@ -139,13 +140,13 @@ fn push_bits(bitvec: &mut BitVec<u8, Lsb0>, byte: u8, count: usize) {
 }
 
 fn push_payload(bitvec: &mut BitVec<u8, Lsb0>, payload: &[Value<i8>]) {
-    let mut prev_const = None;
+    let mut prev_const: Option<u8> = None;
     for i in payload {
         match i {
             Value::Var(var) => {
                 if let Some(prev_val) = prev_const.take() {
                     push_bits(bitvec, 0b10, 2);
-                    push_bits(bitvec, prev_val as u8, 8);
+                    push_bits(bitvec, prev_val, 8);
                 }
                 push_bits(bitvec, 0b01, 2);
                 push_bits(bitvec, *var, 4);
@@ -153,10 +154,51 @@ fn push_payload(bitvec: &mut BitVec<u8, Lsb0>, payload: &[Value<i8>]) {
             Value::Const(val) => {
                 if let Some(prev_val) = prev_const.take() {
                     push_bits(bitvec, 0b11, 2);
-                    push_bits(bitvec, prev_val as u8, 8);
+                    push_bits(bitvec, prev_val, 8);
                     push_bits(bitvec, *val as u8, 8);
                 } else {
-                    prev_const = Some(*val);
+                    prev_const = Some(*val as u8);
+                }
+            }
+        }
+    }
+    if let Some(prev_val) = prev_const.take() {
+        push_bits(bitvec, 0b10, 2);
+        push_bits(bitvec, prev_val, 8);
+    }
+    push_bits(bitvec, 0b00, 2);
+}
+
+fn push_payload2(bitvec: &mut BitVec<u8, Lsb0>, payload: &[Value<i16>]) {
+    let mut prev_const: Option<u8> = None;
+    for i in payload {
+        match i {
+            Value::Var(var) => {
+                if let Some(prev_val) = prev_const.take() {
+                    push_bits(bitvec, 0b10, 2);
+                    push_bits(bitvec, prev_val, 8);
+                }
+                push_bits(bitvec, 0b01, 2);
+                push_bits(bitvec, *var, 4);
+            }
+            Value::Const(val) => {
+                let bytes = val.to_le_bytes();
+                if bytes[1] != 0 {
+                    if let Some(prev_val) = prev_const.take() {
+                        push_bits(bitvec, 0b10, 2);
+                        push_bits(bitvec, prev_val, 8);
+                    }
+                    push_bits(bitvec, 0b11, 2);
+                    push_bits(bitvec, bytes[0], 8);
+                    push_bits(bitvec, bytes[1], 8);
+                } else {
+                    if let Some(prev_val) = prev_const.take() {
+                        push_bits(bitvec, 0b11, 2);
+                        push_bits(bitvec, prev_val, 8);
+                        push_bits(bitvec, bytes[0], 8);
+                    } else {
+                        prev_const = Some(bytes[0]);
+                    }
                 }
             }
         }
@@ -168,6 +210,24 @@ fn push_payload(bitvec: &mut BitVec<u8, Lsb0>, payload: &[Value<i8>]) {
     push_bits(bitvec, 0b00, 2);
 }
 
+fn push_value2(bitvec: &mut BitVec<u8, Lsb0>, value: &Value<i16>) {
+    match value {
+        Value::Var(var) => {
+            bitvec.push(false);
+            push_bits(bitvec, 0, 1);
+            push_bits(bitvec, *var, 4);
+        }
+        Value::Const(val) => {
+            let bytes = val.to_le_bytes();
+            bitvec.push(bytes[1] != 0);
+            push_bits(bitvec, bytes[0], 8);
+            if bytes[1] != 0 {
+                push_bits(bitvec, bytes[1], 8);
+            }
+        }
+    }
+}
+
 fn encode_action(ops: &[Op]) -> Vec<u8> {
     let mut bitvec = BitVec::<u8, Lsb0>::new();
     for op in ops {
@@ -175,23 +235,33 @@ fn encode_action(ops: &[Op]) -> Vec<u8> {
             Op::Kill => {
                 push_bits(&mut bitvec, 0, 5);
             }
-            Op::Pause(value) => {}
+            Op::Pause(value) => {
+                push_value2(&mut bitvec, value);
+            }
             Op::Mouse {
                 auto_release,
                 payload,
-            } => {}
+            } => {
+                push_bits(&mut bitvec, 23, 5);
+                bitvec.push(*auto_release);
+                push_payload2(&mut bitvec, payload);
+            }
             Op::Key {
                 auto_release,
                 payload,
             } => {
                 push_bits(&mut bitvec, 24, 5);
                 bitvec.push(*auto_release);
-                // XXX push payload
+                push_payload(&mut bitvec, payload);
             }
             Op::Media {
                 auto_release,
                 payload,
-            } => {}
+            } => {
+                push_bits(&mut bitvec, 27, 5);
+                bitvec.push(*auto_release);
+                push_payload(&mut bitvec, payload);
+            }
         }
     }
     bitvec.into()
