@@ -1,4 +1,5 @@
 use bitvec::prelude::*;
+use std::fmt;
 
 pub struct BitStream<'a> {
     bits: &'a BitSlice<u8, Lsb0>,
@@ -47,10 +48,25 @@ impl<'a> BitStream<'a> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy)]
 pub enum Value<T> {
     Var(u8),
     Const(T),
+}
+
+impl<T> From<T> for Value<T> {
+    fn from(val: T) -> Self {
+        Self::Const(val)
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for Value<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Var(var) => write!(f, "Var({:?})", var),
+            Self::Const(val) => write!(f, "{:?}", val),
+        }
+    }
 }
 
 impl Default for Value<i16> {
@@ -79,6 +95,30 @@ pub enum Op {
         auto_release: bool,
         payload: Vec<Value<i8>>,
     },
+}
+
+impl Op {
+    fn pause(value: impl Into<Value<i16>>) -> Self {
+        Self::Pause(value.into())
+    }
+
+    fn mouse(
+        auto_release: bool,
+        buttons: impl Into<Value<i16>>,
+        dx: impl Into<Value<i16>>,
+        dy: impl Into<Value<i16>>,
+        wheel1: impl Into<Value<i16>>,
+        wheel2: impl Into<Value<i16>>,
+    ) -> Self {
+        Self::Mouse {
+            auto_release,
+            buttons: buttons.into(),
+            dx: dx.into(),
+            dy: dy.into(),
+            wheel1: wheel1.into(),
+            wheel2: wheel2.into(),
+        }
+    }
 }
 
 fn get_payload(bitstream: &mut BitStream) -> Result<Vec<Value<i8>>, &'static str> {
@@ -381,16 +421,9 @@ mod tests {
                 auto_release: false,
                 payload: vec![Const(1)],
             },
-            Pause(Const(100)),
-            Mouse {
-                auto_release: false,
-                buttons: Const(0),
-                dx: Const(0),
-                dy: Const(0),
-                wheel1: Const(1),
-                wheel2: Const(0),
-            },
-            Pause(Const(100)),
+            Op::pause(100),
+            Op::mouse(false, 0, 0, 0, 1, 0),
+            Op::pause(100),
             Key {
                 auto_release: false,
                 payload: vec![],
@@ -404,16 +437,9 @@ mod tests {
                 auto_release: false,
                 payload: vec![Const(1)],
             },
-            Pause(Const(100)),
-            Mouse {
-                auto_release: false,
-                buttons: Const(0),
-                dx: Const(0),
-                dy: Const(0),
-                wheel1: Const(-1),
-                wheel2: Const(0),
-            },
-            Pause(Const(100)),
+            Op::pause(100),
+            Op::mouse(false, 0, 0, 0, -1, 0),
+            Op::pause(100),
             Key {
                 auto_release: false,
                 payload: vec![],
