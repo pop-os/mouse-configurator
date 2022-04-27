@@ -119,6 +119,20 @@ impl Op {
             wheel2: wheel2.into(),
         }
     }
+
+    fn key(auto_release: bool, payload: Vec<Value<i8>>) -> Self {
+        Self::Key {
+            auto_release,
+            payload,
+        }
+    }
+
+    fn media(auto_release: bool, payload: Vec<Value<i8>>) -> Self {
+        Self::Key {
+            auto_release,
+            payload: payload,
+        }
+    }
 }
 
 fn get_payload(bitstream: &mut BitStream) -> Result<Vec<Value<i8>>, &'static str> {
@@ -329,7 +343,7 @@ pub fn decode_action(action: &[u8]) -> Result<Vec<Op>, String> {
             }
             23 => {
                 let auto_release = bitstream.bit().ok_or("Failed to read key auto release")?;
-                let mut payload = get_payload2(&mut bitstream)?;
+                let payload = get_payload2(&mut bitstream)?;
                 ops.push(Op::Mouse {
                     auto_release,
                     buttons: payload.get(0).copied().unwrap_or_default(),
@@ -341,7 +355,7 @@ pub fn decode_action(action: &[u8]) -> Result<Vec<Op>, String> {
             }
             24 => {
                 let auto_release = bitstream.bit().ok_or("Failed to read key auto release")?;
-                let mut payload = get_payload(&mut bitstream)?;
+                let payload = get_payload(&mut bitstream)?;
                 ops.push(Op::Key {
                     auto_release,
                     payload,
@@ -349,7 +363,7 @@ pub fn decode_action(action: &[u8]) -> Result<Vec<Op>, String> {
             }
             27 => {
                 let auto_release = bitstream.bit().ok_or("Failed to read key auto release")?;
-                let mut payload = get_payload(&mut bitstream)?;
+                let payload = get_payload(&mut bitstream)?;
                 ops.push(Op::Media {
                     auto_release,
                     payload,
@@ -417,33 +431,21 @@ mod tests {
 
     fn zoom_in() -> Vec<Op> {
         vec![
-            Key {
-                auto_release: false,
-                payload: vec![Const(1)],
-            },
+            Op::key(false, vec![Const(1)]),
             Op::pause(100),
             Op::mouse(false, 0, 0, 0, 1, 0),
             Op::pause(100),
-            Key {
-                auto_release: false,
-                payload: vec![],
-            },
+            Op::key(false, vec![]),
         ]
     }
 
     fn zoom_out() -> Vec<Op> {
         vec![
-            Key {
-                auto_release: false,
-                payload: vec![Const(1)],
-            },
+            Op::key(false, vec![Const(1)]),
             Op::pause(100),
             Op::mouse(false, 0, 0, 0, -1, 0),
             Op::pause(100),
-            Key {
-                auto_release: false,
-                payload: vec![],
-            },
+            Op::key(false, vec![]),
         ]
     }
 
