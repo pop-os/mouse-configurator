@@ -39,13 +39,13 @@ impl<'a> BitStream<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Value<T> {
     Var(u8),
     Const(T),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Op {
     Kill,
     Pause(Value<i16>),
@@ -267,6 +267,53 @@ fn encode_action(ops: &[Op]) -> Vec<u8> {
     bitvec.into()
 }
 
+pub fn decode_action(action: &[u8]) -> Result<Vec<Op>, String> {
+    let mut bitstream = BitStream::new(action);
+
+    let mut ops = Vec::new();
+    while !bitstream.is_empty() {
+        let op = bitstream.bits(5).ok_or("Failed to read OP")?;
+        match op {
+            0 => {
+                ops.push(Op::Kill);
+                break;
+            }
+            21 => {
+                ops.push(Op::Pause(get_value2(&mut bitstream, false)?));
+            }
+            23 => {
+                let auto_release = bitstream.bit().ok_or("Failed to read key auto release")?;
+                let mut payload = get_payload2(&mut bitstream)?;
+                ops.push(Op::Mouse {
+                    auto_release,
+                    payload,
+                });
+            }
+            24 => {
+                let auto_release = bitstream.bit().ok_or("Failed to read key auto release")?;
+                let mut payload = get_payload(&mut bitstream)?;
+                ops.push(Op::Key {
+                    auto_release,
+                    payload,
+                });
+            }
+            27 => {
+                let auto_release = bitstream.bit().ok_or("Failed to read key auto release")?;
+                let mut payload = get_payload(&mut bitstream)?;
+                ops.push(Op::Media {
+                    auto_release,
+                    payload,
+                });
+            }
+            _ => {
+                return Err(format!("Unsupported OP {}", op));
+            }
+        }
+    }
+
+    Ok(ops)
+}
+
 #[derive(Debug)]
 pub struct Button {
     pub(crate) id: u8,
@@ -277,49 +324,61 @@ pub struct Button {
 
 impl Button {
     pub fn decode_action(&self) -> Result<Vec<Op>, String> {
-        let mut bitstream = BitStream::new(&self.action);
+        decode_action(&self.action)
+    }
+}
 
-        let mut ops = Vec::new();
-        while !bitstream.is_empty() {
-            let op = bitstream.bits(5).ok_or("Failed to read OP")?;
-            match op {
-                0 => {
-                    ops.push(Op::Kill);
-                    break;
-                }
-                21 => {
-                    ops.push(Op::Pause(get_value2(&mut bitstream, false)?));
-                }
-                23 => {
-                    let auto_release = bitstream.bit().ok_or("Failed to read key auto release")?;
-                    let mut payload = get_payload2(&mut bitstream)?;
-                    ops.push(Op::Mouse {
-                        auto_release,
-                        payload,
-                    });
-                }
-                24 => {
-                    let auto_release = bitstream.bit().ok_or("Failed to read key auto release")?;
-                    let mut payload = get_payload(&mut bitstream)?;
-                    ops.push(Op::Key {
-                        auto_release,
-                        payload,
-                    });
-                }
-                27 => {
-                    let auto_release = bitstream.bit().ok_or("Failed to read key auto release")?;
-                    let mut payload = get_payload(&mut bitstream)?;
-                    ops.push(Op::Media {
-                        auto_release,
-                        payload,
-                    });
-                }
-                _ => {
-                    return Err(format!("Unsupported OP {}", op));
-                }
-            }
-        }
+#[cfg(test)]
+mod tests {
+    use super::{Op::*, Value::*, *};
 
-        Ok(ops)
+    fn zoom_in() -> Vec<Op> {
+        vec![
+            Key {
+                auto_release: false,
+                payload: vec![Const(1)],
+            },
+            Pause(Const(100)),
+            Mouse {
+                auto_release: false,
+                payload: vec![Const(0), Const(0), Const(0), Const(1)],
+            },
+            Pause(Const(100)),
+            Key {
+                auto_release: false,
+                payload: vec![],
+            },
+        ]
+    }
+
+    fn zoom_out() -> Vec<Op> {
+        vec![
+            Key {
+                auto_release: false,
+                payload: vec![Const(1)],
+            },
+            Pause(Const(100)),
+            Mouse {
+                auto_release: false,
+                payload: vec![Const(0), Const(0), Const(0), Const(-1)],
+            },
+            Pause(Const(100)),
+            Key {
+                auto_release: false,
+                payload: vec![],
+            },
+        ]
+    }
+
+    #[test]
+    fn test_zoom_in() {
+        let zoom_in = zoom_in();
+        assert_eq!(decode_action(&encode_action(&zoom_in)).unwrap(), zoom_in);
+    }
+
+    #[test]
+    fn test_zoom_out() {
+        let zoom_out = zoom_out();
+        assert_eq!(decode_action(&encode_action(&zoom_out)).unwrap(), zoom_out);
     }
 }
