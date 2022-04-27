@@ -311,6 +311,30 @@ pub struct Button {
 }
 
 impl Button {
+    pub fn decode(data: &[u8]) -> Option<(Self, usize)> {
+        if data.len() <= 3 {
+            // Buffer too small
+            return None;
+        }
+
+        let size = data[3] as usize;
+        let button = Self {
+            id: data[0],
+            host_id: data[1],
+            press_type: data[2],
+            action: data.get(4..4 + size)?.to_vec(),
+        };
+        Some((button, 4 + size))
+    }
+
+    pub fn encode(&self, data: &mut Vec<u8>) {
+        data.push(self.id);
+        data.push(self.host_id);
+        data.push(self.press_type);
+        data.push(self.action.len() as u8);
+        data.extend_from_slice(&self.action);
+    }
+
     pub fn decode_action(&self) -> Result<Vec<Op>, String> {
         decode_action(&self.action)
     }

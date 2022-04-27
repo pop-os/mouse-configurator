@@ -171,25 +171,12 @@ impl HpMouseEventIterator {
         let mut buttons = Vec::with_capacity(programmed_buttons as usize);
         let mut i = 5;
         while buttons.len() < programmed_buttons as usize {
-            if data.len() <= i + 3 {
-                // Buffer too small
+            if let Some((button, count)) = Button::decode(&data[i..]) {
+                buttons.push(button);
+                i += count;
+            } else {
                 break;
             }
-
-            let size = data[i + 3] as usize;
-            let mut button = Button {
-                id: data[i + 0],
-                host_id: data[i + 1],
-                press_type: data[i + 2],
-                action: Vec::with_capacity(size),
-            };
-            i += 4;
-
-            while i < data.len() && button.action.len() < size {
-                button.action.push(data[i]);
-                i += 1;
-            }
-            buttons.push(button);
         }
 
         for button in buttons.iter() {

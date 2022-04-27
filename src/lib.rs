@@ -92,6 +92,22 @@ impl HpMouse {
         self.write_report_1(17, &[host_id, command, dpi[0], dpi[1]])
     }
 
+    pub fn set_button(&self, button: Button, no_save_to_flash: bool) -> io::Result<()> {
+        let command = 1;
+        let no_save_to_flash = if no_save_to_flash { 1 << 7 } else { 0 };
+        let mut data = vec![command & no_save_to_flash];
+        button.encode(&mut data);
+        self.write_report_1(13, &data)
+    }
+
+    pub fn exec_button(&self, button: Button) -> io::Result<()> {
+        let command = 2;
+        let host_id = 0;
+        let mut data = vec![command, host_id];
+        button.encode(&mut data);
+        self.write_report_1(13, &data)
+    }
+
     // Using multiple readers will result in inconsistent behavior
     pub fn read(&self) -> HpMouseEventIterator {
         HpMouseEventIterator::new(self.dev.clone())
