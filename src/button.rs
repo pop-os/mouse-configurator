@@ -138,6 +138,36 @@ fn push_bits(bitvec: &mut BitVec<u8, Lsb0>, byte: u8, count: usize) {
     bitvec.extend_from_bitslice(&[byte].view_bits::<Lsb0>()[..count]);
 }
 
+fn push_payload(bitvec: &mut BitVec<u8, Lsb0>, payload: &[Value<i8>]) {
+    let mut prev_const = None;
+    for i in payload {
+        match i {
+            Value::Var(var) => {
+                if let Some(prev_val) = prev_const.take() {
+                    push_bits(bitvec, 0b10, 2);
+                    push_bits(bitvec, prev_val as u8, 8);
+                }
+                push_bits(bitvec, 0b01, 2);
+                push_bits(bitvec, *var, 4);
+            }
+            Value::Const(val) => {
+                if let Some(prev_val) = prev_const.take() {
+                    push_bits(bitvec, 0b11, 2);
+                    push_bits(bitvec, prev_val as u8, 8);
+                    push_bits(bitvec, *val as u8, 8);
+                } else {
+                    prev_const = Some(*val);
+                }
+            }
+        }
+    }
+    if let Some(prev_val) = prev_const.take() {
+        push_bits(bitvec, 0b10, 2);
+        push_bits(bitvec, prev_val as u8, 8);
+    }
+    push_bits(bitvec, 0b00, 2);
+}
+
 fn encode_action(ops: &[Op]) -> Vec<u8> {
     let mut bitvec = BitVec::<u8, Lsb0>::new();
     for op in ops {
