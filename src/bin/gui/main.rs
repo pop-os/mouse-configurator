@@ -1,12 +1,32 @@
 use gtk4::{pango, prelude::*};
-use relm4::{send, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets};
+use relm4::{send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets};
 
-use hp_mouse_configurator::Event;
+use hp_mouse_configurator::{Button, Event};
 
+mod bindings;
 mod dialog;
-use dialog::DialogModel;
+use dialog::{DialogModel, DialogMsg};
 mod worker;
 use worker::{WorkerModel, WorkerMsg};
+
+const BUTTON_RIGHT: u8 = 0;
+const BUTTON_MIDDLE: u8 = 1;
+const BUTTON_LEFT_BOTTOM: u8 = 2;
+const BUTTON_LEFT_TOP: u8 = 3;
+const BUTTON_SCROLL_LEFT: u8 = 4;
+const BUTTON_SCROLL_RIGHT: u8 = 5;
+const BUTTON_LEFT_CENTER: u8 = 6;
+
+static BUTTONS: &[(&str, u8)] = &[
+    ("Right Click", BUTTON_RIGHT),
+    ("Middle Click", BUTTON_MIDDLE),
+    ("Back", BUTTON_LEFT_BOTTOM),
+    ("Forward", BUTTON_LEFT_TOP),
+    ("Scroll Left", BUTTON_SCROLL_LEFT),
+    ("Scroll Right", BUTTON_SCROLL_RIGHT),
+    ("Scroll Right", BUTTON_SCROLL_RIGHT),
+    ("Super", BUTTON_LEFT_CENTER),
+];
 
 struct Mouse {
     min_sensitivity: f64,
@@ -31,10 +51,10 @@ struct AppModel {
 }
 
 enum AppMsg {
-    SetSensitivity(f64),
     RenameConfig,
     Event(Event),
     SetDpi(f64),
+    SetBinding(Button),
 }
 
 impl Model for AppModel {
@@ -46,7 +66,6 @@ impl Model for AppModel {
 impl AppUpdate for AppModel {
     fn update(&mut self, msg: AppMsg, components: &AppComponents, _sender: Sender<AppMsg>) -> bool {
         match msg {
-            AppMsg::SetSensitivity(sensitivity) => {}
             AppMsg::RenameConfig => {}
             AppMsg::Event(event) => match event {
                 Event::Battery { level, .. } => self.battery_percent = level,
@@ -61,6 +80,10 @@ impl AppUpdate for AppModel {
                 // XXX don't queue infinitely?
                 send!(components.worker, WorkerMsg::SetDpi(value as u16));
                 self.sensitivity = Some(value);
+            }
+            AppMsg::SetBinding(button) => {
+                // TODO fewer layers of indirection?
+                send!(components.worker, WorkerMsg::SetBinding(button));
             }
         }
         true
@@ -120,13 +143,8 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             set_icon_name: "view-more-symbolic"
                         }
                     },
-                    append = &gtk4::Button {
-                        set_label: "Right button",
-                        /*
-                        connect_clicked(components.dialog.sender) => move |_| {
-                            send!(sender, AppMsg::StartTimer)
-                        }
-                        */
+                    append: button_box = &gtk4::Box {
+                        set_orientation: gtk4::Orientation::Vertical,
                     },
                     append = &gtk4::Label {
                         set_label: "Select a button to change its binding. Your settings are automatically saved to firmware.",
@@ -186,6 +204,19 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 
     fn post_init() {
+        for (name, id) in BUTTONS {
+            let dialog_sender = components.dialog.sender();
+            view! {
+               button = &gtk4::Button {
+                    set_label: name,
+                    connect_clicked => move |_| {
+                        send!(dialog_sender, DialogMsg::Show(*id))
+                    }
+                }
+            }
+            button_box.append(&button);
+        }
+
         let _ = components.worker.send(WorkerMsg::DetectDevice);
     }
 }

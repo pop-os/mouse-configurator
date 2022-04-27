@@ -2,11 +2,12 @@ use relm4::{ComponentUpdate, Model, Sender};
 use std::thread;
 
 use super::AppMsg;
-use hp_mouse_configurator::{enumerate, HpMouse};
+use hp_mouse_configurator::{enumerate, Button, HpMouse};
 
 pub enum WorkerMsg {
     DetectDevice,
     SetDpi(u16),
+    SetBinding(Button),
 }
 
 pub struct WorkerModel {
@@ -69,6 +70,12 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
                 if let Some(mouse) = &self.mouse {
                     // XXX error
                     let _ = mouse.set_dpi(value);
+                }
+            }
+            WorkerMsg::SetBinding(button) => {
+                if let Some(mouse) = &self.mouse {
+                    // XXX error
+                    let _ = mouse.set_button(button, false);
                 }
             }
         }

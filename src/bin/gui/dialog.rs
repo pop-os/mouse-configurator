@@ -1,13 +1,22 @@
 use gtk4::prelude::*;
-use relm4::{ComponentUpdate, Model, Sender, Widgets};
+use relm4::{send, view, ComponentUpdate, Model, Sender, Widgets};
+use std::collections::HashMap;
+
+use crate::{
+    bindings::{Entry, BINDINGS},
+    AppMsg,
+};
+use hp_mouse_configurator::Button;
 
 pub enum DialogMsg {
-    Show(u8), // XXX button
+    Show(u8),
     Hide,
+    Selected(&'static Entry),
 }
 
 #[derive(Default)]
 pub struct DialogModel {
+    button_id: u8,
     shown: bool,
 }
 
@@ -27,14 +36,20 @@ impl ComponentUpdate<super::AppModel> for DialogModel {
         msg: DialogMsg,
         _components: &(),
         _sender: Sender<DialogMsg>,
-        _parent_sender: Sender<super::AppMsg>,
+        parent_sender: Sender<AppMsg>,
     ) {
         match msg {
-            DialogMsg::Show(button) => {
+            DialogMsg::Show(button_id) => {
+                println!("FOO");
+                self.button_id = button_id;
                 self.shown = true;
             }
             DialogMsg::Hide => {
                 self.shown = false;
+            }
+            DialogMsg::Selected(entry) => {
+                let button = Button::new(self.button_id, 1, 0, entry.binding); // XXX
+                send!(parent_sender, AppMsg::SetBinding(button));
             }
         }
     }
@@ -49,7 +64,7 @@ impl Widgets<DialogModel, super::AppModel> for DialogWidgets {
             set_visible: watch!(model.shown),
             set_child = Some(&gtk4::ScrolledWindow) {
                 set_hscrollbar_policy: gtk4::PolicyType::Never,
-                set_child = Some(&gtk4::Box) {
+                set_child: vbox = Some(&gtk4::Box) {
                     set_orientation: gtk4::Orientation::Vertical,
                     set_halign: gtk4::Align::Center,
                     set_hexpand: false,
@@ -59,6 +74,45 @@ impl Widgets<DialogModel, super::AppModel> for DialogWidgets {
                     set_margin_bottom: 12,
                 }
             }
+        }
+    }
+
+    fn post_init() {
+        for category in BINDINGS {
+            let mut rows = HashMap::new();
+
+            view! {
+                label = gtk4::Label {
+                    set_label: category.label // TODO
+                }
+            }
+            view! {
+                list_box = gtk4::ListBox {
+                }
+            }
+            vbox.append(&label);
+            vbox.append(&list_box);
+
+            for entry in category.entries {
+                // associate with &Entry, or indices?
+                view! {
+                    row = gtk4::ListBoxRow {
+                        set_child = Some(&gtk4::Box) {
+                            set_orientation: gtk4::Orientation::Horizontal,
+                            append = &gtk4::Label {
+                                set_label: entry.label, // TODO
+                            }
+                        }
+                    }
+                }
+                list_box.append(&row);
+                rows.insert(row, entry);
+            }
+
+            let sender = sender.clone();
+            list_box.connect_row_activated(move |_, row| {
+                send!(sender, DialogMsg::Selected(rows.get(row).unwrap()));
+            });
         }
     }
 }
