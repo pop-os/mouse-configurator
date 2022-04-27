@@ -65,6 +65,7 @@ pub enum Op {
     Pause(Value<i16>),
     Mouse {
         auto_release: bool,
+        buttons: Value<i16>,
         dx: Value<i16>,
         dy: Value<i16>,
         wheel1: Value<i16>,
@@ -238,6 +239,7 @@ fn encode_action(ops: &[Op]) -> Vec<u8> {
             }
             Op::Mouse {
                 auto_release,
+                buttons,
                 dx,
                 dy,
                 wheel1,
@@ -245,7 +247,11 @@ fn encode_action(ops: &[Op]) -> Vec<u8> {
             } => {
                 push_bits(&mut bitvec, 23, 5);
                 bitvec.push(*auto_release);
-                push_payload2(&mut bitvec, &[*dx, *dy, *wheel1, *wheel2]);
+                let mut payload: &[_] = &[*buttons, *dx, *dy, *wheel1, *wheel2];
+                while payload.last() == Some(&Value::Const(0)) {
+                    payload = &payload[..payload.len() - 1];
+                }
+                push_payload2(&mut bitvec, payload);
             }
             Op::Key {
                 auto_release,
@@ -286,10 +292,11 @@ pub fn decode_action(action: &[u8]) -> Result<Vec<Op>, String> {
                 let mut payload = get_payload2(&mut bitstream)?;
                 ops.push(Op::Mouse {
                     auto_release,
-                    dx: payload.get(0).copied().unwrap_or_default(),
-                    dy: payload.get(1).copied().unwrap_or_default(),
-                    wheel1: payload.get(2).copied().unwrap_or_default(),
-                    wheel2: payload.get(3).copied().unwrap_or_default(),
+                    buttons: payload.get(0).copied().unwrap_or_default(),
+                    dx: payload.get(1).copied().unwrap_or_default(),
+                    dy: payload.get(2).copied().unwrap_or_default(),
+                    wheel1: payload.get(3).copied().unwrap_or_default(),
+                    wheel2: payload.get(4).copied().unwrap_or_default(),
                 });
             }
             24 => {
@@ -377,10 +384,11 @@ mod tests {
             Pause(Const(100)),
             Mouse {
                 auto_release: false,
+                buttons: Const(0),
                 dx: Const(0),
                 dy: Const(0),
-                wheel1: Const(0),
-                wheel2: Const(1),
+                wheel1: Const(1),
+                wheel2: Const(0),
             },
             Pause(Const(100)),
             Key {
@@ -399,10 +407,11 @@ mod tests {
             Pause(Const(100)),
             Mouse {
                 auto_release: false,
+                buttons: Const(0),
                 dx: Const(0),
                 dy: Const(0),
-                wheel1: Const(0),
-                wheel2: Const(-1),
+                wheel1: Const(-1),
+                wheel2: Const(0),
             },
             Pause(Const(100)),
             Key {
