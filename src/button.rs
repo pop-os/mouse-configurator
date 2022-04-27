@@ -311,6 +311,15 @@ pub struct Button {
 }
 
 impl Button {
+    pub fn new(id: u8, host_id: u8, press_type: u8, action: &[Op]) -> Self {
+        Self {
+            id,
+            host_id,
+            press_type,
+            action: encode_action(action),
+        }
+    }
+
     pub fn decode(data: &[u8]) -> Option<(Self, usize)> {
         if data.len() <= 3 {
             // Buffer too small
