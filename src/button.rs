@@ -260,8 +260,7 @@ pub fn decode_action(action: &[u8]) -> Result<Vec<Op>, String> {
     let mut bitstream = BitStream::new(action);
 
     let mut ops = Vec::new();
-    while !bitstream.is_empty() {
-        let op = bitstream.bits(5).ok_or("Failed to read OP")?;
+    while let Some(op) = bitstream.bits(5) {
         match op {
             0 => {
                 ops.push(Op::Kill);
@@ -337,7 +336,6 @@ mod tests {
                 auto_release: false,
                 payload: vec![],
             },
-            Kill,
         ]
     }
 
@@ -357,7 +355,6 @@ mod tests {
                 auto_release: false,
                 payload: vec![],
             },
-            Kill,
         ]
     }
 
@@ -392,16 +389,13 @@ mod tests {
     fn test_zoom_in_decode() {
         let zoom_in = zoom_in();
         let bytes = &[152, 1, 212, 200, 46, 1, 4, 16, 192, 0, 106, 100, 24];
-        assert_eq!(decode_action(bytes).unwrap(), &zoom_in[..zoom_in.len() - 1]);
+        assert_eq!(decode_action(bytes).unwrap(), zoom_in);
     }
 
     #[test]
     fn test_zoom_out_decode() {
         let zoom_out = zoom_out();
         let bytes = &[152, 1, 212, 200, 46, 1, 4, 16, 192, 127, 106, 100, 24];
-        assert_eq!(
-            decode_action(bytes).unwrap(),
-            &zoom_out[..zoom_out.len() - 1]
-        );
+        assert_eq!(decode_action(bytes).unwrap(), zoom_out);
     }
 }
