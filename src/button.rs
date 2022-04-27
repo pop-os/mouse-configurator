@@ -6,9 +6,11 @@ pub struct BitStream<'a> {
 
 impl<'a> BitStream<'a> {
     fn new(data: &'a [u8]) -> Self {
-        Self {
-            bits: data.view_bits(),
-        }
+        Self::for_bitslice(data.view_bits())
+    }
+
+    fn for_bitslice(bits: &'a BitSlice<u8, Lsb0>) -> Self {
+        Self { bits }
     }
 
     fn bit(&mut self) -> Option<bool> {
@@ -21,12 +23,14 @@ impl<'a> BitStream<'a> {
     }
 
     fn bits(&mut self, count: usize) -> Option<u8> {
-        if count > 8 {
-            println!("BitStream::bits: requested too many bits: {}", count);
-            return None;
-        }
+        assert!(
+            count <= 8,
+            "BitStream::bits: requested too many bits: {}",
+            count
+        );
 
         if let Some(bits) = self.bits.get(..count) {
+            assert!(bits.len() == count);
             self.bits = &self.bits[count..];
             Some(bits.load_le::<u8>())
         } else {
@@ -36,6 +40,10 @@ impl<'a> BitStream<'a> {
 
     fn is_empty(&self) -> bool {
         self.bits.is_empty()
+    }
+
+    fn len(&self) -> usize {
+        self.bits.len()
     }
 }
 
@@ -211,15 +219,13 @@ fn push_payload2(bitvec: &mut BitVec<u8, Lsb0>, payload: &[Value<i16>]) {
 }
 
 fn push_value2(bitvec: &mut BitVec<u8, Lsb0>, value: &Value<i16>) {
+    bitvec.push(matches!(value, Value::Const(_)));
     match value {
-        Value::Var(var) => {
-            bitvec.push(false);
-            push_bits(bitvec, 0, 1);
-            push_bits(bitvec, *var, 4);
-        }
+        Value::Var(var) => push_bits(bitvec, *var, 4),
         Value::Const(val) => {
             let bytes = val.to_le_bytes();
             bitvec.push(bytes[1] != 0);
+
             push_bits(bitvec, bytes[0], 8);
             if bytes[1] != 0 {
                 push_bits(bitvec, bytes[1], 8);
@@ -348,6 +354,7 @@ mod tests {
                 auto_release: false,
                 payload: vec![],
             },
+            Kill,
         ]
     }
 
@@ -367,7 +374,23 @@ mod tests {
                 auto_release: false,
                 payload: vec![],
             },
+            Kill,
         ]
+    }
+
+    #[test]
+    fn test_value2() {
+        let mut bitvec = BitVec::<u8, Lsb0>::new();
+        push_value2(&mut bitvec, &Const(100));
+        let mut bitstream = BitStream::for_bitslice(&bitvec);
+        assert_eq!(get_value2(&mut bitstream, true).unwrap(), Const(100));
+        assert_eq!(bitstream.len(), 0);
+    }
+
+    #[test]
+    fn test_pause() {
+        let pause = vec![Pause(Const(100)), Kill];
+        assert_eq!(decode_action(&encode_action(&pause)).unwrap(), pause);
     }
 
     #[test]
