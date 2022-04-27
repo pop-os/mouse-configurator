@@ -178,42 +178,24 @@ fn push_payload(bitvec: &mut BitVec<u8, Lsb0>, payload: &[Value<i8>]) {
 }
 
 fn push_payload2(bitvec: &mut BitVec<u8, Lsb0>, payload: &[Value<i16>]) {
-    let mut prev_const: Option<u8> = None;
     for i in payload {
         match i {
             Value::Var(var) => {
-                if let Some(prev_val) = prev_const.take() {
-                    push_bits(bitvec, 0b10, 2);
-                    push_bits(bitvec, prev_val, 8);
-                }
                 push_bits(bitvec, 0b01, 2);
                 push_bits(bitvec, *var, 4);
             }
             Value::Const(val) => {
                 let bytes = val.to_le_bytes();
                 if bytes[1] != 0 {
-                    if let Some(prev_val) = prev_const.take() {
-                        push_bits(bitvec, 0b10, 2);
-                        push_bits(bitvec, prev_val, 8);
-                    }
                     push_bits(bitvec, 0b11, 2);
                     push_bits(bitvec, bytes[0], 8);
                     push_bits(bitvec, bytes[1], 8);
                 } else {
-                    if let Some(prev_val) = prev_const.take() {
-                        push_bits(bitvec, 0b11, 2);
-                        push_bits(bitvec, prev_val, 8);
-                        push_bits(bitvec, bytes[0], 8);
-                    } else {
-                        prev_const = Some(bytes[0]);
-                    }
+                    push_bits(bitvec, 0b10, 2);
+                    push_bits(bitvec, bytes[0], 8);
                 }
             }
         }
-    }
-    if let Some(prev_val) = prev_const.take() {
-        push_bits(bitvec, 0b10, 2);
-        push_bits(bitvec, prev_val as u8, 8);
     }
     push_bits(bitvec, 0b00, 2);
 }
@@ -242,6 +224,7 @@ fn encode_action(ops: &[Op]) -> Vec<u8> {
                 push_bits(&mut bitvec, 0, 5);
             }
             Op::Pause(value) => {
+                push_bits(&mut bitvec, 21, 5);
                 push_value2(&mut bitvec, value);
             }
             Op::Mouse {
@@ -403,5 +386,22 @@ mod tests {
     fn test_zoom_out() {
         let zoom_out = zoom_out();
         assert_eq!(decode_action(&encode_action(&zoom_out)).unwrap(), zoom_out);
+    }
+
+    #[test]
+    fn test_zoom_in_decode() {
+        let zoom_in = zoom_in();
+        let bytes = &[152, 1, 212, 200, 46, 1, 4, 16, 192, 0, 106, 100, 24];
+        assert_eq!(decode_action(bytes).unwrap(), &zoom_in[..zoom_in.len() - 1]);
+    }
+
+    #[test]
+    fn test_zoom_out_decode() {
+        let zoom_out = zoom_out();
+        let bytes = &[152, 1, 212, 200, 46, 1, 4, 16, 192, 127, 106, 100, 24];
+        assert_eq!(
+            decode_action(bytes).unwrap(),
+            &zoom_out[..zoom_out.len() - 1]
+        );
     }
 }
