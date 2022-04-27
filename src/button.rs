@@ -40,73 +40,97 @@ impl<'a> BitStream<'a> {
 }
 
 #[derive(Debug)]
-pub enum Value {
+pub enum Value<T> {
     Var(u8),
-    Const(i32),
+    Const(T),
 }
 
 #[derive(Debug)]
 pub enum Op {
     Kill,
-    Pause(Value),
+    Pause(Value<i16>),
     Mouse {
         auto_release: bool,
-        payload: Vec<Value>,
+        payload: Vec<Value<i16>>,
     },
     Key {
         auto_release: bool,
-        payload: Vec<Value>,
+        payload: Vec<Value<i8>>,
     },
     Media {
         auto_release: bool,
-        payload: Vec<Value>,
+        payload: Vec<Value<i8>>,
     },
 }
 
-fn get_payload(bitstream: &mut BitStream) -> Result<Vec<Value>, &'static str> {
+fn get_payload(bitstream: &mut BitStream) -> Result<Vec<Value<i8>>, &'static str> {
     let mut values = Vec::new();
     loop {
-        values.push(
-            match bitstream.bits(2).ok_or("Failed to read payload kind")? {
-                0b00 => {
-                    break;
-                }
-                0b01 => Value::Var(bitstream.bits(4).ok_or("Failed to read payload nibble")?),
+        match bitstream.bits(2).ok_or("Failed to read payload kind")? {
+            0b00 => {
+                break;
+            }
+            0b01 => {
+                let nibble = bitstream.bits(4).ok_or("Failed to read payload nibble")?;
+                values.push(Value::Var(nibble));
+            }
 
-                0b10 => {
-                    let byte = bitstream.bits(8).ok_or("Failed to read payload byte")?;
-                    Value::Const(i32::from(byte as i8))
-                }
-                0b11 => Value::Const(
-                    i16::from_le_bytes([
-                        bitstream.bits(8).ok_or("Failed to read payload byte")?,
-                        bitstream.bits(8).ok_or("Failed to read payload byte")?,
-                    ])
-                    .into(),
-                ),
-                _ => unreachable!(),
-            },
-        );
+            0b10 => {
+                let byte = bitstream.bits(8).ok_or("Failed to read payload byte")?;
+                values.push(Value::Const(byte as i8));
+            }
+            0b11 => {
+                let byte1 = bitstream.bits(8).ok_or("Failed to read payload byte")?;
+                let byte2 = bitstream.bits(8).ok_or("Failed to read payload byte")?;
+                values.push(Value::Const(byte1 as i8));
+                values.push(Value::Const(byte2 as i8));
+            }
+            _ => unreachable!(),
+        }
     }
     Ok(values)
 }
 
-fn get_value2(bitstream: &mut BitStream, signed: bool) -> Result<Value, &'static str> {
+fn get_payload2(bitstream: &mut BitStream) -> Result<Vec<Value<i16>>, &'static str> {
+    let mut values = Vec::new();
+    loop {
+        match bitstream.bits(2).ok_or("Failed to read payload kind")? {
+            0b00 => {
+                break;
+            }
+            0b01 => {
+                let nibble = bitstream.bits(4).ok_or("Failed to read payload nibble")?;
+                values.push(Value::Var(nibble));
+            }
+
+            0b10 => {
+                let byte = bitstream.bits(8).ok_or("Failed to read payload byte")?;
+                values.push(Value::Const(i16::from(byte as i8)));
+            }
+            0b11 => {
+                let byte1 = bitstream.bits(8).ok_or("Failed to read payload byte")?;
+                let byte2 = bitstream.bits(8).ok_or("Failed to read payload byte")?;
+                values.push(Value::Const(i16::from_le_bytes([byte1, byte2])));
+            }
+            _ => unreachable!(),
+        }
+    }
+    Ok(values)
+}
+
+fn get_value2(bitstream: &mut BitStream, signed: bool) -> Result<Value<i16>, &'static str> {
     if !bitstream.bit().ok_or("Failed to read value bit")? {
         Ok(Value::Var(
             bitstream.bits(4).ok_or("Failed to read value nibble")?,
         ))
     } else if !bitstream.bit().ok_or("Failed to read value bit")? {
         let byte = bitstream.bits(8).ok_or("Failed to read value byte")?;
-        Ok(Value::Const(i32::from(byte as i8)))
+        Ok(Value::Const(i16::from(byte as i8)))
     } else {
-        Ok(Value::Const(
-            i16::from_le_bytes([
-                bitstream.bits(8).ok_or("Failed to read value byte")?,
-                bitstream.bits(8).ok_or("Failed to read value byte")?,
-            ])
-            .into(),
-        ))
+        Ok(Value::Const(i16::from_le_bytes([
+            bitstream.bits(8).ok_or("Failed to read value byte")?,
+            bitstream.bits(8).ok_or("Failed to read value byte")?,
+        ])))
     }
 }
 
@@ -168,7 +192,7 @@ impl Button {
                 }
                 23 => {
                     let auto_release = bitstream.bit().ok_or("Failed to read key auto release")?;
-                    let mut payload = get_payload(&mut bitstream)?;
+                    let mut payload = get_payload2(&mut bitstream)?;
                     ops.push(Op::Mouse {
                         auto_release,
                         payload,
