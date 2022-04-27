@@ -1,6 +1,6 @@
 use std::{io, path::Path, sync::Arc};
 
-mod button;
+pub mod button;
 pub use button::{Button, Op, Value};
 mod enumerate;
 pub use enumerate::enumerate;

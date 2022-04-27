@@ -1,6 +1,7 @@
 #![allow(overflowing_literals)]
 
 use once_cell::sync::Lazy;
+use std::collections::HashMap;
 
 use hp_mouse_configurator::{Op, Value::*};
 
@@ -64,3 +65,37 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
         },
     ]
 });
+
+impl Entry {
+    fn for_binding(binding: &[Op]) -> Option<&'static Entry> {
+        static ENTRY_FOR_BINDING: Lazy<HashMap<&[Op], &Entry>> = Lazy::new(|| {
+            let mut map = HashMap::new();
+            for category in &*BINDINGS {
+                for entry in &category.entries {
+                    map.insert(entry.binding.as_slice(), entry);
+                }
+            }
+            map
+        });
+        ENTRY_FOR_BINDING.get(binding).copied()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use hp_mouse_configurator::button::{decode_action, encode_action};
+
+    use super::*;
+
+    #[test]
+    fn invertible_bindings() {
+        for category in &*BINDINGS {
+            for entry in &category.entries {
+                assert_eq!(
+                    decode_action(&encode_action(&entry.binding)).unwrap(),
+                    entry.binding
+                );
+            }
+        }
+    }
+}

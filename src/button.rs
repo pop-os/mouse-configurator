@@ -48,7 +48,7 @@ impl<'a> BitStream<'a> {
     }
 }
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(PartialEq, Eq, Clone, Copy, Hash)]
 pub enum Value<T> {
     Var(u8),
     Const(T),
@@ -75,7 +75,7 @@ impl Default for Value<i16> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Op {
     Kill,
     Pause(Value<i16>),
@@ -280,7 +280,7 @@ fn push_value2(bitvec: &mut BitVec<u8, Lsb0>, value: &Value<i16>) {
     }
 }
 
-fn encode_action(ops: &[Op]) -> Vec<u8> {
+pub fn encode_action(ops: &[Op]) -> Vec<u8> {
     let mut bitvec = BitVec::<u8, Lsb0>::new();
     for op in ops {
         match op {
