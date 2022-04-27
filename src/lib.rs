@@ -1,7 +1,7 @@
 use std::{io, path::Path, sync::Arc};
 
 mod button;
-use button::Button;
+pub use button::{Button, Op, Value};
 mod enumerate;
 pub use enumerate::enumerate;
 mod event;
@@ -95,7 +95,7 @@ impl HpMouse {
     pub fn set_button(&self, button: Button, no_save_to_flash: bool) -> io::Result<()> {
         let command = 1;
         let no_save_to_flash = if no_save_to_flash { 1 << 7 } else { 0 };
-        let mut data = vec![command & no_save_to_flash];
+        let mut data = vec![command | no_save_to_flash];
         button.encode(&mut data);
         self.write_report_1(13, &data)
     }
