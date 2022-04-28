@@ -4,28 +4,21 @@ use relm4::{send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Se
 use hp_mouse_configurator::{Button, Event};
 
 mod bindings;
+use bindings::HardwareButton;
 mod dialog;
 use dialog::{DialogModel, DialogMsg};
 mod worker;
 use worker::{WorkerModel, WorkerMsg};
 
-const BUTTON_RIGHT: u8 = 0;
-const BUTTON_MIDDLE: u8 = 1;
-const BUTTON_LEFT_BOTTOM: u8 = 2;
-const BUTTON_LEFT_TOP: u8 = 3;
-const BUTTON_SCROLL_LEFT: u8 = 4;
-const BUTTON_SCROLL_RIGHT: u8 = 5;
-const BUTTON_LEFT_CENTER: u8 = 6;
-
-static BUTTONS: &[(f64, f64, &str, u8)] = &[
+static BUTTONS: &[(f64, f64, HardwareButton)] = &[
     // XXX Left click button
-    (450., 100., "Right Click", BUTTON_RIGHT),
-    (350., 50., "Middle Click", BUTTON_MIDDLE),
-    (0., 310., "Back", BUTTON_LEFT_BOTTOM),
-    (0., 230., "Forward", BUTTON_LEFT_TOP),
-    (50., 140., "Scroll Left", BUTTON_SCROLL_LEFT),
-    (450., 140., "Scroll Right", BUTTON_SCROLL_RIGHT),
-    (0., 270., "Super", BUTTON_LEFT_CENTER),
+    (450., 100., HardwareButton::Right),
+    (350., 50., HardwareButton::Middle),
+    (0., 310., HardwareButton::LeftBottom),
+    (0., 230., HardwareButton::LeftTop),
+    (50., 140., HardwareButton::ScrollLeft),
+    (450., 140., HardwareButton::ScrollRight),
+    (0., 270., HardwareButton::LeftCenter),
 ];
 
 struct Mouse {
@@ -224,13 +217,14 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 
     fn post_init() {
-        for (x, y, name, id) in BUTTONS {
+        for (x, y, id) in BUTTONS {
+            let name = id.def_binding().label;
             let dialog_sender = components.dialog.sender();
             view! {
                button = &gtk4::Button {
                     set_label: name,
                     connect_clicked => move |_| {
-                        send!(dialog_sender, DialogMsg::Show(*id))
+                        send!(dialog_sender, DialogMsg::Show(*id as u8))
                     }
                 }
             }

@@ -5,6 +5,33 @@ use std::collections::HashMap;
 
 use hp_mouse_configurator::{Op, Value::*};
 
+#[repr(u8)]
+#[derive(Clone, Copy)]
+pub enum HardwareButton {
+    Right = 0,
+    Middle = 1,
+    LeftBottom = 2,
+    LeftTop = 3,
+    ScrollLeft = 4,
+    ScrollRight = 5,
+    LeftCenter = 6,
+}
+
+impl HardwareButton {
+    pub fn def_binding(self) -> &'static Entry {
+        match self {
+            Self::Right => Entry::for_binding(&[Op::mouse(true, 2, 0, 0, 0, 0)]),
+            Self::Middle => Entry::for_binding(&[Op::mouse(true, 4, 0, 0, 0, 0)]),
+            Self::LeftBottom => Entry::for_binding(&[Op::mouse(true, 8, 0, 0, 0, 0)]),
+            Self::LeftTop => Entry::for_binding(&[Op::mouse(true, 16, 0, 0, 0, 0)]),
+            Self::ScrollLeft => Entry::for_binding(&[Op::mouse(false, 0, 0, 0, 0, -1)]),
+            Self::ScrollRight => Entry::for_binding(&[Op::mouse(false, 0, 0, 0, 0, 1)]),
+            Self::LeftCenter => Entry::for_binding(&[Op::key(true, vec![Const(0), Const(0x2B)])]),
+        }
+        .unwrap()
+    }
+}
+
 pub struct Category {
     pub label: &'static str,
     pub entries: Vec<Entry>,
@@ -31,6 +58,27 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                 Entry {
                     label: "Middle Click",
                     binding: vec![Op::mouse(true, 4, 0, 0, 0, 0)],
+                },
+                Entry {
+                    label: "Scroll Left",
+                    binding: vec![Op::mouse(false, 0, 0, 0, 0, -1)],
+                },
+                Entry {
+                    label: "Scroll Right",
+                    binding: vec![Op::mouse(false, 0, 0, 0, 0, 1)],
+                },
+                Entry {
+                    label: "Back",
+                    binding: vec![Op::mouse(true, 8, 0, 0, 0, 0)],
+                },
+                Entry {
+                    label: "Forward",
+                    binding: vec![Op::mouse(true, 16, 0, 0, 0, 0)],
+                },
+                Entry {
+                    // XXX
+                    label: "Switch App",
+                    binding: vec![Op::key(true, vec![Const(0), Const(0x2B)])], // super + tab
                 },
             ],
         },
