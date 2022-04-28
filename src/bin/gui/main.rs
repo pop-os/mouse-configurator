@@ -46,13 +46,13 @@ struct AppComponents {
 #[derive(Default)]
 struct AppModel {
     battery_percent: u8,
-    sensitivity: Option<f64>,
+    sensitivity: Option<u16>,
 }
 
 enum AppMsg {
     RenameConfig,
     Event(Event),
-    SetDpi(f64),
+    SetDpi(u16),
     SetBinding(Button),
 }
 
@@ -70,15 +70,17 @@ impl AppUpdate for AppModel {
                 Event::Battery { level, .. } => self.battery_percent = level,
                 Event::Mouse { dpi, .. } => {
                     if self.sensitivity.is_none() {
-                        self.sensitivity = Some(dpi.into());
+                        self.sensitivity = Some(dpi);
                     }
                 }
                 _ => {}
             },
             AppMsg::SetDpi(value) => {
-                // XXX don't queue infinitely?
-                send!(components.worker, WorkerMsg::SetDpi(value as u16));
-                self.sensitivity = Some(value);
+                if self.sensitivity != Some(value) {
+                    // XXX don't queue infinitely?
+                    send!(components.worker, WorkerMsg::SetDpi(value as u16));
+                    self.sensitivity = Some(value);
+                }
             }
             AppMsg::SetBinding(button) => {
                 // TODO fewer layers of indirection?
@@ -175,15 +177,14 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                         set_label: "Sensitivity (DPI)",
                                     }
                                 },
-                                append = &gtk4::Scale {
+                                append: dpi_scale = &gtk4::Scale {
                                     set_hexpand: true,
-                                    set_adjustment: &gtk4::Adjustment::new(500., 500., 3000., 1., 1., 1.), // XXX don't hard-code?
-                                    set_value: watch! { model.sensitivity.unwrap_or(0.) },
+                                    set_adjustment: &gtk4::Adjustment::new(500. / 50., 500. / 50., 3000. / 50., 1., 1., 1.), // XXX don't hard-code? XXX 800?
+                                    set_value: watch! { f64::from(model.sensitivity.unwrap_or(0)) / 50. },
                                     connect_change_value(sender) => move |_, _, value| {
-                                        send!(sender, AppMsg::SetDpi(value));
+                                        send!(sender, AppMsg::SetDpi((value * 50.) as u16));
                                         gtk4::Inhibit(false)
                                     }
-                                    // add_mark(0., gtk4::PositionType::Bottom, 0.),
                                 }
                             }
                         }
@@ -214,6 +215,14 @@ impl Widgets<AppModel, ()> for AppWidgets {
                 }
             }
             button_box.append(&button);
+        }
+
+        for i in [500, 1000, 1500, 2000, 2500, 3000] {
+            dpi_scale.add_mark(
+                (i / 50).into(),
+                gtk4::PositionType::Bottom,
+                Some(&i.to_string()),
+            );
         }
 
         let _ = components.worker.send(WorkerMsg::DetectDevice);
