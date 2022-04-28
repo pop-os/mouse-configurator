@@ -46,13 +46,14 @@ struct AppComponents {
 #[derive(Default)]
 struct AppModel {
     battery_percent: u8,
-    sensitivity: Option<u16>,
+    dpi: Option<f64>,
+    dpi_step: f64,
 }
 
 enum AppMsg {
     RenameConfig,
     Event(Event),
-    SetDpi(u16),
+    SetDpi(f64),
     SetBinding(Button),
 }
 
@@ -62,25 +63,34 @@ impl Model for AppModel {
     type Components = AppComponents;
 }
 
+impl AppModel {
+    fn round_dpi(&self, dpi: f64) -> u16 {
+        ((dpi / self.dpi_step).round() * self.dpi_step) as u16
+    }
+}
+
 impl AppUpdate for AppModel {
     fn update(&mut self, msg: AppMsg, components: &AppComponents, _sender: Sender<AppMsg>) -> bool {
         match msg {
             AppMsg::RenameConfig => {}
             AppMsg::Event(event) => match event {
                 Event::Battery { level, .. } => self.battery_percent = level,
-                Event::Mouse { dpi, .. } => {
-                    if self.sensitivity.is_none() {
-                        self.sensitivity = Some(dpi);
+                Event::Mouse { dpi, step_dpi, .. } => {
+                    if self.dpi.is_none() {
+                        self.dpi = Some(dpi.into());
+                        self.dpi_step = step_dpi.into();
                     }
                 }
                 _ => {}
             },
             AppMsg::SetDpi(value) => {
-                if self.sensitivity != Some(value) {
+                let new = self.round_dpi(value);
+                let old = self.dpi.map(|value| self.round_dpi(value));
+                if old != Some(new) {
                     // XXX don't queue infinitely?
-                    send!(components.worker, WorkerMsg::SetDpi(value as u16));
-                    self.sensitivity = Some(value);
+                    send!(components.worker, WorkerMsg::SetDpi(new));
                 }
+                self.dpi = Some(value);
             }
             AppMsg::SetBinding(button) => {
                 // TODO fewer layers of indirection?
@@ -160,7 +170,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     append = &gtk4::ListBox {
                         add_css_class: "frame",
                         append = &gtk4::ListBoxRow {
-                            set_sensitive: watch! { model.sensitivity.is_some() },
+                            set_sensitive: watch! { model.dpi.is_some() },
                             set_selectable: false,
                             set_activatable: false,
                             set_child = Some(&gtk4::Box) {
@@ -179,10 +189,10 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                 },
                                 append: dpi_scale = &gtk4::Scale {
                                     set_hexpand: true,
-                                    set_adjustment: &gtk4::Adjustment::new(500. / 50., 500. / 50., 3000. / 50., 1., 1., 1.), // XXX don't hard-code? XXX 800?
-                                    set_value: watch! { f64::from(model.sensitivity.unwrap_or(0)) / 50. },
+                                    set_adjustment: &gtk4::Adjustment::new(500., 500., 3000., 50., 50., 0.), // XXX don't hard-code? XXX 800?
+                                    set_value: watch! { model.dpi.unwrap_or(0.) },
                                     connect_change_value(sender) => move |_, _, value| {
-                                        send!(sender, AppMsg::SetDpi((value * 50.) as u16));
+                                        send!(sender, AppMsg::SetDpi(value));
                                         gtk4::Inhibit(false)
                                     }
                                 }
@@ -218,11 +228,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
         }
 
         for i in [500, 1000, 1500, 2000, 2500, 3000] {
-            dpi_scale.add_mark(
-                (i / 50).into(),
-                gtk4::PositionType::Bottom,
-                Some(&i.to_string()),
-            );
+            dpi_scale.add_mark(i.into(), gtk4::PositionType::Bottom, Some(&i.to_string()));
         }
 
         let _ = components.worker.send(WorkerMsg::DetectDevice);
