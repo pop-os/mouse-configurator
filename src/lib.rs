@@ -92,6 +92,13 @@ impl HpMouse {
         self.write_report_1(17, &[host_id, command, dpi[0], dpi[1]])
     }
 
+    pub fn set_left_handed(&self, left_handed: bool) -> io::Result<()> {
+        let host_id = 0; // current host
+        let command = 6; // set handedness
+        let value = if left_handed { 1 } else { 0 };
+        self.write_report_1(17, &[host_id, command, value, 0])
+    }
+
     pub fn set_button(&self, button: Button, no_save_to_flash: bool) -> io::Result<()> {
         let command = 1;
         let no_save_to_flash = if no_save_to_flash { 1 << 7 } else { 0 };

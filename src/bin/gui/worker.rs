@@ -7,6 +7,7 @@ use hp_mouse_configurator::{enumerate, Button, HpMouse};
 pub enum WorkerMsg {
     DetectDevice,
     SetDpi(u16),
+    SetLeftHanded(bool),
     SetBinding(Button),
 }
 
@@ -70,6 +71,12 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
                 if let Some(mouse) = &self.mouse {
                     // XXX error
                     let _ = mouse.set_dpi(value);
+                }
+            }
+            WorkerMsg::SetLeftHanded(value) => {
+                if let Some(mouse) = &self.mouse {
+                    // XXX error
+                    let _ = mouse.set_left_handed(value);
                 }
             }
             WorkerMsg::SetBinding(button) => {

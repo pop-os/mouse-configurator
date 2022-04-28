@@ -11,15 +11,15 @@ use dialog::{DialogModel, DialogMsg};
 mod worker;
 use worker::{WorkerModel, WorkerMsg};
 
-static BUTTONS: &[(f64, f64, HardwareButton)] = &[
-    // XXX Left click button
-    (450., 100., HardwareButton::Right),
-    (350., 50., HardwareButton::Middle),
-    (0., 310., HardwareButton::LeftBottom),
-    (0., 230., HardwareButton::LeftTop),
-    (50., 140., HardwareButton::ScrollLeft),
-    (450., 140., HardwareButton::ScrollRight),
-    (0., 270., HardwareButton::LeftCenter),
+static BUTTONS: &[(f64, f64, Option<HardwareButton>)] = &[
+    (50., 100., None), // Left click button (except in left-handed mode)
+    (450., 100., Some(HardwareButton::Right)),
+    (350., 50., Some(HardwareButton::Middle)),
+    (0., 310., Some(HardwareButton::LeftBottom)),
+    (0., 230., Some(HardwareButton::LeftTop)),
+    (50., 140., Some(HardwareButton::ScrollLeft)),
+    (450., 140., Some(HardwareButton::ScrollRight)),
+    (0., 270., Some(HardwareButton::LeftCenter)),
 ];
 
 struct Mouse {
@@ -44,7 +44,21 @@ struct AppModel {
     dpi: Option<f64>,
     dpi_step: f64,
     bindings: HashMap<HardwareButton, &'static Entry>,
+    left_handed: bool,
     bindings_changed: bool,
+}
+
+impl AppModel {
+    // Swap left and right buttons, if in left handed mode
+    fn swap_buttons(&self, button: Option<HardwareButton>) -> Option<HardwareButton> {
+        if self.left_handed && button.is_none() {
+            Some(HardwareButton::Right)
+        } else if self.left_handed && button == Some(HardwareButton::Right) {
+            None
+        } else {
+            button
+        }
+    }
 }
 
 enum AppMsg {
@@ -52,6 +66,7 @@ enum AppMsg {
     Event(Event),
     SetDpi(f64),
     SetBinding(Button),
+    SelectButton(Option<HardwareButton>),
 }
 
 impl Model for AppModel {
@@ -74,17 +89,26 @@ impl AppUpdate for AppModel {
             AppMsg::RenameConfig => {}
             AppMsg::Event(event) => match event {
                 Event::Battery { level, .. } => self.battery_percent = level,
-                Event::Mouse { dpi, step_dpi, .. } => {
+                Event::Mouse {
+                    dpi,
+                    step_dpi,
+                    left_handed,
+                    ..
+                } => {
                     if self.dpi.is_none() {
                         self.dpi = Some(dpi.into());
                         self.dpi_step = step_dpi.into();
                     }
+                    self.left_handed = left_handed;
+                    self.bindings_changed = true;
                 }
                 Event::Buttons { buttons, .. } => {
                     // Reset `self.bindings` to defaults
                     self.bindings.clear();
                     for (_, _, id) in BUTTONS {
-                        self.bindings.insert(*id, id.def_binding());
+                        if let Some(id) = id {
+                            self.bindings.insert(*id, id.def_binding());
+                        }
                     }
 
                     for button in buttons {
@@ -122,6 +146,18 @@ impl AppUpdate for AppModel {
                     send!(components.worker, WorkerMsg::SetDpi(new));
                 }
                 self.dpi = Some(value);
+            }
+            AppMsg::SelectButton(button) => {
+                let button = self.swap_buttons(button);
+                if let Some(id) = button {
+                    send!(components.dialog, DialogMsg::Show(id as u8))
+                } else {
+                    // XXX dialog
+                    send!(
+                        components.worker,
+                        WorkerMsg::SetLeftHanded(!self.left_handed)
+                    );
+                }
             }
             AppMsg::SetBinding(button) => {
                 // TODO fewer layers of indirection?
@@ -254,19 +290,18 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 
     additional_fields! {
-        buttons: Vec<(HardwareButton, gtk4::Button)>,
+        buttons: Vec<(Option<HardwareButton>, gtk4::Button)>,
     }
 
     fn post_init() {
         let mut buttons = Vec::new();
 
         for (x, y, id) in BUTTONS {
-            let dialog_sender = components.dialog.sender();
             view! {
                button = &gtk4::Button {
                     set_label: "Unknown",
-                    connect_clicked => move |_| {
-                        send!(dialog_sender, DialogMsg::Show(*id as u8))
+                    connect_clicked(sender) => move |_| {
+                        send!(sender, AppMsg::SelectButton(*id));
                     }
                 }
             }
@@ -284,7 +319,11 @@ impl Widgets<AppModel, ()> for AppWidgets {
     fn post_view() {
         if model.bindings_changed {
             for (id, button) in &self.buttons {
-                button.set_label(model.bindings.get(id).map_or("Unknown", |x| x.label));
+                if let Some(id) = model.swap_buttons(*id) {
+                    button.set_label(model.bindings.get(&id).map_or("Unknown", |x| x.label));
+                } else {
+                    button.set_label("Left Click");
+                }
             }
         }
     }
