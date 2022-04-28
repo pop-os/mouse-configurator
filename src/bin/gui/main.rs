@@ -17,14 +17,15 @@ const BUTTON_SCROLL_LEFT: u8 = 4;
 const BUTTON_SCROLL_RIGHT: u8 = 5;
 const BUTTON_LEFT_CENTER: u8 = 6;
 
-static BUTTONS: &[(&str, u8)] = &[
-    ("Right Click", BUTTON_RIGHT),
-    ("Middle Click", BUTTON_MIDDLE),
-    ("Back", BUTTON_LEFT_BOTTOM),
-    ("Forward", BUTTON_LEFT_TOP),
-    ("Scroll Left", BUTTON_SCROLL_LEFT),
-    ("Scroll Right", BUTTON_SCROLL_RIGHT),
-    ("Super", BUTTON_LEFT_CENTER),
+static BUTTONS: &[(f64, f64, &str, u8)] = &[
+    // Left click button
+    (450., 100., "Right Click", BUTTON_RIGHT),
+    (350., 50., "Middle Click", BUTTON_MIDDLE),
+    (0., 310., "Back", BUTTON_LEFT_BOTTOM),
+    (0., 230., "Forward", BUTTON_LEFT_TOP),
+    (50., 140., "Scroll Left", BUTTON_SCROLL_LEFT),
+    (450., 140., "Scroll Right", BUTTON_SCROLL_RIGHT),
+    (0., 270., "Super", BUTTON_LEFT_CENTER),
 ];
 
 struct Mouse {
@@ -154,8 +155,13 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             set_icon_name: "view-more-symbolic"
                         }
                     },
-                    append: button_box = &gtk4::Box {
-                        set_orientation: gtk4::Orientation::Vertical,
+                    append = &gtk4::Overlay {
+                        set_child = Some(&gtk4::Image) {
+                            set_resource: Some("/org/pop-os/hp-mouse-configurator/mouse-dark.svg"), // XXX light?
+                            set_pixel_size: 512,
+                        },
+                        add_overlay: button_fixed = &gtk4::Fixed {
+                        }
                     },
                     append = &gtk4::Label {
                         set_label: "Select a button to change its binding. Your settings are automatically saved to firmware.",
@@ -214,7 +220,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 
     fn post_init() {
-        for (name, id) in BUTTONS {
+        for (x, y, name, id) in BUTTONS {
             let dialog_sender = components.dialog.sender();
             view! {
                button = &gtk4::Button {
@@ -224,7 +230,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     }
                 }
             }
-            button_box.append(&button);
+            button_fixed.put(&button, *x, *y);
         }
 
         for i in [500, 1000, 1500, 2000, 2500, 3000] {
