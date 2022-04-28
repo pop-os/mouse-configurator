@@ -1,10 +1,11 @@
 use gtk4::{gio, pango, prelude::*};
 use relm4::{send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets};
+use std::collections::HashMap;
 
 use hp_mouse_configurator::{Button, Event};
 
 mod bindings;
-use bindings::HardwareButton;
+use bindings::{Entry, HardwareButton};
 mod dialog;
 use dialog::{DialogModel, DialogMsg};
 mod worker;
@@ -42,6 +43,8 @@ struct AppModel {
     battery_percent: u8,
     dpi: Option<f64>,
     dpi_step: f64,
+    bindings: HashMap<HardwareButton, &'static Entry>,
+    bindings_changed: bool,
 }
 
 enum AppMsg {
@@ -65,6 +68,8 @@ impl AppModel {
 
 impl AppUpdate for AppModel {
     fn update(&mut self, msg: AppMsg, components: &AppComponents, _sender: Sender<AppMsg>) -> bool {
+        self.bindings_changed = false;
+
         match msg {
             AppMsg::RenameConfig => {}
             AppMsg::Event(event) => match event {
@@ -74,6 +79,38 @@ impl AppUpdate for AppModel {
                         self.dpi = Some(dpi.into());
                         self.dpi_step = step_dpi.into();
                     }
+                }
+                Event::Buttons { buttons, .. } => {
+                    // Reset `self.bindings` to defaults
+                    self.bindings.clear();
+                    for (_, _, id) in BUTTONS {
+                        self.bindings.insert(*id, id.def_binding());
+                    }
+
+                    for button in buttons {
+                        let id = match HardwareButton::from_u8(button.id) {
+                            Some(id) => id,
+                            None => {
+                                eprintln!("Unrecognized button id: {}", button.id);
+                                continue;
+                            }
+                        };
+                        match button.decode_action() {
+                            Ok(action) => {
+                                if let Some(entry) = Entry::for_binding(&action) {
+                                    self.bindings.insert(id, entry);
+                                } else {
+                                    self.bindings.remove(&id);
+                                    eprintln!("Unrecognized action: {:?}", action);
+                                }
+                            }
+                            Err(err) => {
+                                eprintln!("Unable to decode button action: {}", err);
+                            }
+                        }
+                    }
+
+                    self.bindings_changed = true;
                 }
                 _ => {}
             },
@@ -216,19 +253,25 @@ impl Widgets<AppModel, ()> for AppWidgets {
         }
     }
 
+    additional_fields! {
+        buttons: Vec<(HardwareButton, gtk4::Button)>,
+    }
+
     fn post_init() {
+        let mut buttons = Vec::new();
+
         for (x, y, id) in BUTTONS {
-            let name = id.def_binding().label;
             let dialog_sender = components.dialog.sender();
             view! {
                button = &gtk4::Button {
-                    set_label: name,
+                    set_label: "Unknown",
                     connect_clicked => move |_| {
                         send!(dialog_sender, DialogMsg::Show(*id as u8))
                     }
                 }
             }
             button_fixed.put(&button, *x, *y);
+            buttons.push((*id, button));
         }
 
         for i in [500, 1000, 1500, 2000, 2500, 3000] {
@@ -236,6 +279,14 @@ impl Widgets<AppModel, ()> for AppWidgets {
         }
 
         let _ = components.worker.send(WorkerMsg::DetectDevice);
+    }
+
+    fn post_view() {
+        if model.bindings_changed {
+            for (id, button) in &self.buttons {
+                button.set_label(model.bindings.get(id).map_or("Unknown", |x| x.label));
+            }
+        }
     }
 }
 

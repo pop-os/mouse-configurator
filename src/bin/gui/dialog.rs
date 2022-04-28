@@ -10,6 +10,7 @@ use hp_mouse_configurator::Button;
 
 pub enum DialogMsg {
     Show(u8),
+    #[allow(unused)]
     Hide,
     Selected(&'static Entry),
 }
@@ -49,6 +50,7 @@ impl ComponentUpdate<super::AppModel> for DialogModel {
             DialogMsg::Selected(entry) => {
                 let button = Button::new(self.button_id, 1, 0, &entry.binding); // XXX
                 send!(parent_sender, AppMsg::SetBinding(button));
+                self.shown = false;
             }
         }
     }
@@ -92,9 +94,9 @@ impl Widgets<DialogModel, super::AppModel> for DialogWidgets {
             }
             view! {
                 list_box = gtk4::ListBox {
+                    set_hexpand: true,
                     add_css_class: "frame",
                     set_header_func: header_func,
-                    set_hexpand: true,
                 }
             }
             vbox.append(&label);
@@ -103,6 +105,7 @@ impl Widgets<DialogModel, super::AppModel> for DialogWidgets {
             for entry in &category.entries {
                 view! {
                     row = gtk4::ListBoxRow {
+                        set_selectable: false,
                         set_child = Some(&gtk4::Box) {
                             set_margin_top: 6,
                             set_margin_bottom: 6,

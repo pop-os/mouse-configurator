@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use hp_mouse_configurator::{Op, Value::*};
 
 #[repr(u8)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
 pub enum HardwareButton {
     Right = 0,
     Middle = 1,
@@ -18,13 +18,26 @@ pub enum HardwareButton {
 }
 
 impl HardwareButton {
+    pub fn from_u8(num: u8) -> Option<Self> {
+        match num {
+            0 => Some(Self::Right),
+            1 => Some(Self::Middle),
+            2 => Some(Self::LeftBottom),
+            3 => Some(Self::LeftTop),
+            4 => Some(Self::ScrollLeft),
+            5 => Some(Self::ScrollRight),
+            6 => Some(Self::LeftCenter),
+            _ => None,
+        }
+    }
+
     pub fn def_binding(self) -> &'static Entry {
         match self {
             Self::Right => Entry::for_binding(&[Op::mouse(true, 2, 0, 0, 0, 0)]),
             Self::Middle => Entry::for_binding(&[Op::mouse(true, 4, 0, 0, 0, 0)]),
             Self::LeftBottom => Entry::for_binding(&[Op::mouse(true, 8, 0, 0, 0, 0)]),
             Self::LeftTop => Entry::for_binding(&[Op::mouse(true, 16, 0, 0, 0, 0)]),
-            Self::ScrollLeft => Entry::for_binding(&[Op::mouse(false, 0, 0, 0, 0, -1)]),
+            Self::ScrollLeft => Entry::for_binding(&[Op::mouse(false, 0, 0, 0, 0, -1)]), // XXX not same as default?
             Self::ScrollRight => Entry::for_binding(&[Op::mouse(false, 0, 0, 0, 0, 1)]),
             Self::LeftCenter => Entry::for_binding(&[Op::key(true, vec![Const(0), Const(0x2B)])]),
         }
@@ -37,6 +50,7 @@ pub struct Category {
     pub entries: Vec<Entry>,
 }
 
+#[derive(Debug)]
 pub struct Entry {
     pub label: &'static str,
     pub binding: Vec<Op>,
@@ -115,7 +129,7 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
 });
 
 impl Entry {
-    fn for_binding(binding: &[Op]) -> Option<&'static Entry> {
+    pub fn for_binding(binding: &[Op]) -> Option<&'static Entry> {
         static ENTRY_FOR_BINDING: Lazy<HashMap<&[Op], &Entry>> = Lazy::new(|| {
             let mut map = HashMap::new();
             for category in &*BINDINGS {

@@ -384,9 +384,9 @@ pub fn decode_action(action: &[u8]) -> Result<Vec<Op>, String> {
 
 #[derive(Debug)]
 pub struct Button {
-    pub(crate) id: u8,
-    pub(crate) host_id: u8,
-    pub(crate) press_type: u8,
+    pub id: u8,
+    pub host_id: u8,
+    pub press_type: u8,
     pub(crate) action: Vec<u8>,
 }
 
