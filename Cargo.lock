@@ -412,6 +412,7 @@ name = "hp-mouse-configurator"
 version = "0.1.0"
 dependencies = [
  "bitvec",
+ "gio",
  "gtk4",
  "nix",
  "once_cell",

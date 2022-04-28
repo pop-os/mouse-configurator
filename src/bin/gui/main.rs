@@ -1,4 +1,4 @@
-use gtk4::{pango, prelude::*};
+use gtk4::{gio, pango, prelude::*};
 use relm4::{send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets};
 
 use hp_mouse_configurator::{Button, Event};
@@ -242,6 +242,8 @@ relm4::new_stateless_action!(ExportConfig, ConfigActionGroup, "export_config");
 relm4::new_stateless_action!(ResetConfig, ConfigActionGroup, "reset_config");
 
 fn main() {
+    gio::resources_register_include!("compiled.gresource").unwrap();
+
     let model = AppModel::default();
     let app = RelmApp::new(model);
     app.run();

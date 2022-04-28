@@ -14,3 +14,6 @@ udev = "0.6"
 version = "1"
 default-features = false
 features = ["std"]
+
+[build-dependencies]
+gio = "0.15.10"
