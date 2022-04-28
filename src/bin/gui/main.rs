@@ -18,7 +18,7 @@ const BUTTON_SCROLL_RIGHT: u8 = 5;
 const BUTTON_LEFT_CENTER: u8 = 6;
 
 static BUTTONS: &[(f64, f64, &str, u8)] = &[
-    // Left click button
+    // XXX Left click button
     (450., 100., "Right Click", BUTTON_RIGHT),
     (350., 50., "Middle Click", BUTTON_MIDDLE),
     (0., 310., "Back", BUTTON_LEFT_BOTTOM),
@@ -121,6 +121,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     set_margin_bottom: 12,
                     append = &gtk4::Box {
                         set_orientation: gtk4::Orientation::Horizontal,
+                        set_halign: gtk4::Align::Center,
                         set_spacing: 12,
                         append = &gtk4::Box {
                             set_orientation: gtk4::Orientation::Horizontal,
@@ -145,10 +146,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     },
                     append = &gtk4::Box {
                         set_orientation: gtk4::Orientation::Horizontal,
+                        set_hexpand: true,
                         append = &gtk4::Label {
                             set_label: "Configuration",
                         },
                         append = &gtk4::DropDown {
+                            set_hexpand: true,
                         },
                         append = &gtk4::MenuButton {
                             set_menu_model: Some(&config_menu),
@@ -165,6 +168,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     },
                     append = &gtk4::Label {
                         set_label: "Select a button to change its binding. Your settings are automatically saved to firmware.",
+                        set_margin_bottom: 12,
                     },
                     append = &gtk4::Label {
                         set_label: "Sensitivity",
