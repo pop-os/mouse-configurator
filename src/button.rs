@@ -39,10 +39,12 @@ impl<'a> BitStream<'a> {
         }
     }
 
+    #[allow(unused)]
     fn is_empty(&self) -> bool {
         self.bits.is_empty()
     }
 
+    #[allow(unused)]
     fn len(&self) -> usize {
         self.bits.len()
     }
@@ -191,7 +193,7 @@ fn get_payload2(bitstream: &mut BitStream) -> Result<Vec<Value<i16>>, &'static s
 }
 
 // XXX signed
-fn get_value2(bitstream: &mut BitStream, signed: bool) -> Result<Value<i16>, &'static str> {
+fn get_value2(bitstream: &mut BitStream, _signed: bool) -> Result<Value<i16>, &'static str> {
     if !bitstream.bit().ok_or("Failed to read value bit")? {
         Ok(Value::Var(
             bitstream.bits(4).ok_or("Failed to read value nibble")?,

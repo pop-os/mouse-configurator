@@ -22,16 +22,6 @@ static BUTTONS: &[(f64, f64, Option<HardwareButton>)] = &[
     (0., 270., Some(HardwareButton::LeftCenter)),
 ];
 
-struct Mouse {
-    min_sensitivity: f64,
-    max_sensitivity: f64,
-}
-
-static BRAIN_MOUSE: Mouse = Mouse {
-    min_sensitivity: 500.,
-    max_sensitivity: 3000.,
-};
-
 #[derive(relm4::Components)]
 struct AppComponents {
     dialog: RelmComponent<DialogModel, AppModel>,
@@ -62,6 +52,7 @@ impl AppModel {
 }
 
 enum AppMsg {
+    #[allow(unused)]
     RenameConfig,
     Event(Event),
     SetDpi(f64),

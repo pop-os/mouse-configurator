@@ -1,6 +1,6 @@
 use hp_mouse_configurator::{enumerate, HpMouse};
 
-fn hp_mouse(mut mouse: HpMouse) {
+fn hp_mouse(mouse: HpMouse) {
     println!("Found HP mouse");
 
     mouse.query_firmware().unwrap();

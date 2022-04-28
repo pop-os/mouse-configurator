@@ -10,6 +10,7 @@ fn u16_from_bytes(low: u8, high: u8) -> u16 {
 #[derive(Default, Clone, Copy)]
 struct Header {
     signature: u16,
+    #[allow(unused)]
     composit_device: u8,
     length: usize,
     sequence: u8,
