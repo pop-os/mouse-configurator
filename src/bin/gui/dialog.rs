@@ -67,8 +67,7 @@ impl Widgets<DialogModel, super::AppModel> for DialogWidgets {
                 set_hscrollbar_policy: gtk4::PolicyType::Never,
                 set_child: vbox = Some(&gtk4::Box) {
                     set_orientation: gtk4::Orientation::Vertical,
-                    set_halign: gtk4::Align::Center,
-                    set_hexpand: false,
+                    set_hexpand: true,
                     set_margin_start: 12,
                     set_margin_end: 12,
                     set_margin_top: 12,
@@ -95,20 +94,20 @@ impl Widgets<DialogModel, super::AppModel> for DialogWidgets {
                 list_box = gtk4::ListBox {
                     add_css_class: "frame",
                     set_header_func: header_func,
+                    set_hexpand: true,
                 }
             }
             vbox.append(&label);
             vbox.append(&list_box);
 
             for entry in &category.entries {
-                // associate with &Entry, or indices?
                 view! {
                     row = gtk4::ListBoxRow {
-                        set_margin_top: 6,
-                        set_margin_bottom: 6,
-                        set_margin_start: 6,
-                        set_margin_end: 6,
                         set_child = Some(&gtk4::Box) {
+                            set_margin_top: 6,
+                            set_margin_bottom: 6,
+                            set_margin_start: 6,
+                            set_margin_end: 6,
                             set_orientation: gtk4::Orientation::Horizontal,
                             append = &gtk4::Label {
                                 set_label: entry.label, // TODO Translate?
