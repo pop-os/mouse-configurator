@@ -1,4 +1,4 @@
-use gtk4::{gdk, gio, glib, pango, prelude::*, subclass::prelude::*};
+use gtk4::{gdk, gdk_pixbuf, gio, glib, pango, prelude::*, subclass::prelude::*};
 use relm4::{send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets};
 use std::collections::HashMap;
 
@@ -265,7 +265,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     },
                     append = &gtk4::Box {
                         set_orientation: gtk4::Orientation::Horizontal,
-                        set_hexpand: true,
                         append = &gtk4::Label {
                             set_label: "Configuration",
                         },
@@ -277,14 +276,18 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             set_icon_name: "view-more-symbolic"
                         }
                     },
-                    append = &gtk4::Overlay {
-                        set_hexpand: false,
+                    // One element box to work around weird size allocation behavior
+                    append = &gtk4::Box {
+                        set_vexpand: false,
                         set_halign: gtk4::Align::Center,
-                        set_child = Some(&gtk4::Picture) {
-                            set_resource: Some("/org/pop-os/hp-mouse-configurator/mouse-dark.svg"), // XXX light
-                            set_size_request: args!(IMAGE_WIDTH, -1),
-                        },
-                        add_overlay: buttons_widget = &ButtonsWidget {
+                        append = &gtk4::Overlay {
+                            set_child = Some(&gtk4::Picture) {
+                                set_pixbuf: Some(&gdk_pixbuf::Pixbuf::from_resource_at_scale("/org/pop-os/hp-mouse-configurator/mouse-dark.svg", IMAGE_WIDTH, -1, true).unwrap()), // XXX light
+                                set_can_shrink: false,
+                            },
+                            add_overlay: buttons_widget = &ButtonsWidget {
+                            },
+                            set_measure_overlay: args!(&buttons_widget, false),
                         }
                     },
                     append = &gtk4::Label {
