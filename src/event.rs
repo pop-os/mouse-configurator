@@ -1,5 +1,5 @@
 use bitvec::prelude::*;
-use std::{io, mem, num::NonZeroU8, str, sync::Arc};
+use std::{mem, num::NonZeroU8, str, sync::Arc};
 
 use crate::{Button, Hid, HP_SIGNATURE};
 
@@ -7,7 +7,7 @@ fn u16_from_bytes(low: u8, high: u8) -> u16 {
     u16::from_le_bytes([low, high])
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq)]
 struct Header {
     signature: u16,
     #[allow(unused)]
@@ -245,8 +245,8 @@ impl HpMouseEventIterator {
         })
     }
 
-    fn report_1(&mut self, data: &[u8]) -> Option<Event> {
-        let header = Header::new(data)?;
+    fn report_1(&mut self, data: &[u8]) -> Result<Option<Event>, String> {
+        let header = Header::new(data).ok_or_else(|| "Invalid header".to_string())?;
 
         let kind_opt = header.kind();
         println!(
@@ -255,20 +255,26 @@ impl HpMouseEventIterator {
         );
 
         // Ensure signature is valid and can be converted to a packet kind
-        let kind = kind_opt?;
+        let kind = kind_opt.ok_or_else(|| "Invalid header signature".to_string())?;
 
-        //TODO: replace asserts with errors
-
-        // Insert new incoming packet if sequence is 0, assert that there is no current one
+        // Insert new incoming packet if sequence is 0, verify there is no current one
         if header.sequence == 0 {
-            assert_eq!(self.incoming.len(), 0);
+            if !self.incoming.is_empty() {
+                return Err("Unexpected packet sequence 0".to_string());
+            }
             self.header = header;
-        // Get current incoming packet, assert that it exists
+        // Get current incoming packet, verify that it exists
         } else {
-            assert_eq!(header.signature, self.header.signature);
-            assert_eq!(header.length, self.header.length);
-            assert_eq!(header.sequence, self.header.sequence + 1);
+            if self.incoming.is_empty() {
+                return Err(format!("Unexpected packet sequence {}", header.sequence));
+            }
             self.header.sequence += 1;
+            if header != self.header {
+                return Err(format!(
+                    "Non-matching header. Expected: {:?} Found: {:?}",
+                    self.header, header
+                ));
+            }
         }
 
         // Push back new data
@@ -278,22 +284,22 @@ impl HpMouseEventIterator {
         if self.incoming.len() >= header.length {
             let mut incoming = mem::take(&mut self.incoming);
             incoming.truncate(header.length);
-            return match kind {
+            return Ok(match kind {
                 1 => self.report_1_packet_1(&incoming),
                 6 => self.report_1_packet_6(&incoming),
                 14 => self.report_1_packet_14(&incoming),
                 18 => self.report_1_packet_18(&incoming),
                 _ => None,
-            };
+            });
         }
 
         // No full packet yet
-        None
+        Ok(None)
     }
 }
 
 impl Iterator for HpMouseEventIterator {
-    type Item = io::Result<Event>;
+    type Item = Result<Event, String>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut buf = [0; 4096];
@@ -301,7 +307,7 @@ impl Iterator for HpMouseEventIterator {
             let len = match self.dev.read(&mut buf) {
                 Ok(len) => len,
                 Err(err) => {
-                    return Some(Err(err));
+                    return Some(Err(err.to_string()));
                 }
             };
             eprintln!("HID read {}", len);
@@ -317,10 +323,13 @@ impl Iterator for HpMouseEventIterator {
 
             match buf[0] {
                 1 => match self.report_1(&buf[1..len]) {
-                    Some(event) => {
+                    Ok(Some(event)) => {
                         return Some(Ok(event));
                     }
-                    None => {}
+                    Ok(None) => {}
+                    Err(err) => {
+                        return Some(Err(err));
+                    }
                 },
                 _ => {}
             }
