@@ -243,6 +243,10 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             set_child = Some(&gtk4::Box) {
                                 set_orientation: gtk4::Orientation::Horizontal,
                                 append = &gtk4::Box {
+                                    set_margin_top: 6,
+                                    set_margin_bottom: 6,
+                                    set_margin_start: 6,
+                                    set_margin_end: 6,
                                     set_orientation: gtk4::Orientation::Vertical,
                                     append = &gtk4::Label {
                                         set_label: "Mouse Cursor Speed",
@@ -253,6 +257,9 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                     append = &gtk4::Label {
                                         set_label: "Sensitivity (DPI)",
                                     }
+                                },
+                                append = &gtk4::Label {
+                                    set_label: watch! { &model.dpi.map_or_else(String::new, |dpi| format!("{:.0}", (dpi / 50.).round() * 50.)) },
                                 },
                                 append: dpi_scale = &gtk4::Scale {
                                     set_hexpand: true,
@@ -298,10 +305,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
             }
             button_fixed.put(&button, *x, *y);
             buttons.push((*id, button));
-        }
-
-        for i in [500, 1000, 1500, 2000, 2500, 3000] {
-            dpi_scale.add_mark(i.into(), gtk4::PositionType::Bottom, Some(&i.to_string()));
         }
 
         let _ = components.worker.send(WorkerMsg::DetectDevice);
