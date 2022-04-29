@@ -39,17 +39,17 @@ impl Default for ButtonsWidget {
 impl ButtonsWidget {
     // XXX RTL?
     fn add_button(&self, button: &gtk4::LinkButton, x: f64, y: f64, right: bool) {
+        let w = IMAGE_WIDTH as f64;
+        let h = w * IMAGE_RATIO;
+
         let layout_manager: gtk4::ConstraintLayout =
             self.layout_manager().unwrap().downcast().unwrap();
         button.set_parent(self);
-        layout_manager.add_constraint(&gtk4::Constraint::new(
+        layout_manager.add_constraint(&gtk4::Constraint::new_constant(
             Some(button),
             gtk4::ConstraintAttribute::Bottom,
             gtk4::ConstraintRelation::Eq,
-            None::<&gtk4::Widget>,
-            gtk4::ConstraintAttribute::None,
-            1.,
-            y,
+            y * h,
             0,
         ));
         let side = if right {
@@ -57,32 +57,31 @@ impl ButtonsWidget {
         } else {
             gtk4::ConstraintAttribute::Left
         };
-        layout_manager.add_constraint(&gtk4::Constraint::new(
+        layout_manager.add_constraint(&gtk4::Constraint::new_constant(
             Some(button),
             side,
             gtk4::ConstraintRelation::Eq,
-            None::<&gtk4::Widget>,
-            gtk4::ConstraintAttribute::None,
-            1.,
-            x,
+            x * w,
             0,
         ));
     }
 }
 
+const IMAGE_WIDTH: i32 = 512;
+const IMAGE_RATIO: f64 = 347. / 474.; // Height/width
 static BUTTONS: &[(f64, f64, bool, Option<HardwareButton>)] = &[
     // Middle click
-    (470., 90., true, Some(HardwareButton::Middle)),
+    (0.9, 0.07, true, Some(HardwareButton::Middle)),
     // Left and right click (swapped in left handed mode)
-    (50., 140., false, None),
-    (512., 140., true, Some(HardwareButton::Right)),
+    (0.1, 0.2, false, None),
+    (1.0, 0.2, true, Some(HardwareButton::Right)),
     // Scroll buttons
-    (50., 180., false, Some(HardwareButton::ScrollLeft)),
-    (512., 180., true, Some(HardwareButton::ScrollRight)),
+    (0.1, 0.3, false, Some(HardwareButton::ScrollLeft)),
+    (1.0, 0.3, true, Some(HardwareButton::ScrollRight)),
     // Side buttons
-    (0., 270., false, Some(HardwareButton::LeftTop)),
-    (0., 295., false, Some(HardwareButton::LeftCenter)),
-    (0., 330., false, Some(HardwareButton::LeftBottom)),
+    (0.0, 0.5, false, Some(HardwareButton::LeftTop)),
+    (0.0, 0.6, false, Some(HardwareButton::LeftCenter)),
+    (0.0, 0.7, false, Some(HardwareButton::LeftBottom)),
 ];
 
 #[derive(relm4::Components)]
@@ -279,9 +278,11 @@ impl Widgets<AppModel, ()> for AppWidgets {
                         }
                     },
                     append = &gtk4::Overlay {
-                        set_child = Some(&gtk4::Image) {
-                            set_resource: Some("/org/pop-os/hp-mouse-configurator/mouse-dark.svg"), // XXX light?
-                            set_pixel_size: 512,
+                        set_hexpand: false,
+                        set_halign: gtk4::Align::Center,
+                        set_child = Some(&gtk4::Picture) {
+                            set_resource: Some("/org/pop-os/hp-mouse-configurator/mouse-dark.svg"), // XXX light
+                            set_size_request: args!(IMAGE_WIDTH, -1),
                         },
                         add_overlay: buttons_widget = &ButtonsWidget {
                         }
