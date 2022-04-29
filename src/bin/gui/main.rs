@@ -259,11 +259,11 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                     }
                                 },
                                 append = &gtk4::Label {
-                                    set_label: watch! { &model.dpi.map_or_else(String::new, |dpi| format!("{:.0}", (dpi / 50.).round() * 50.)) },
+                                    set_label: watch! { &model.dpi.map_or_else(String::new, |dpi| format!("{}", model.round_dpi(dpi))) },
                                 },
                                 append: dpi_scale = &gtk4::Scale {
                                     set_hexpand: true,
-                                    set_adjustment: &gtk4::Adjustment::new(500., 500., 3000., 50., 50., 0.), // XXX don't hard-code? XXX 800?
+                                    set_adjustment: &gtk4::Adjustment::new(800., 800., 3000., 50., 50., 0.), // XXX don't hard-code? XXX 800?
                                     set_value: watch! { model.dpi.unwrap_or(0.) },
                                     connect_change_value(sender) => move |_, _, value| {
                                         send!(sender, AppMsg::SetDpi(value));
