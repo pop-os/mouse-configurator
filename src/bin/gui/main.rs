@@ -1,4 +1,4 @@
-use gtk4::{gio, pango, prelude::*};
+use gtk4::{gdk, gio, glib, pango, prelude::*, subclass::prelude::*};
 use relm4::{send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets};
 use std::collections::HashMap;
 
@@ -11,15 +11,78 @@ use dialog::{DialogModel, DialogMsg};
 mod worker;
 use worker::{WorkerModel, WorkerMsg};
 
-static BUTTONS: &[(f64, f64, Option<HardwareButton>)] = &[
-    (50., 100., None), // Left click button (except in left-handed mode)
-    (450., 100., Some(HardwareButton::Right)),
-    (350., 50., Some(HardwareButton::Middle)),
-    (0., 310., Some(HardwareButton::LeftBottom)),
-    (0., 230., Some(HardwareButton::LeftTop)),
-    (50., 140., Some(HardwareButton::ScrollLeft)),
-    (450., 140., Some(HardwareButton::ScrollRight)),
-    (0., 270., Some(HardwareButton::LeftCenter)),
+#[derive(Default)]
+pub struct ButtonsWidgetInner;
+
+#[glib::object_subclass]
+impl ObjectSubclass for ButtonsWidgetInner {
+    const NAME: &'static str = "ButtonsWidget";
+    type Type = ButtonsWidget;
+    type ParentType = gtk4::Widget;
+}
+
+impl ObjectImpl for ButtonsWidgetInner {}
+impl WidgetImpl for ButtonsWidgetInner {}
+
+glib::wrapper! {
+    pub struct ButtonsWidget(ObjectSubclass<ButtonsWidgetInner>) @extends gtk4::Widget;
+}
+
+impl Default for ButtonsWidget {
+    fn default() -> Self {
+        let widget = glib::Object::new::<Self>(&[]).unwrap();
+        widget.set_layout_manager(Some(&gtk4::ConstraintLayout::new()));
+        widget
+    }
+}
+
+impl ButtonsWidget {
+    // XXX RTL?
+    fn add_button(&self, button: &gtk4::LinkButton, x: f64, y: f64, right: bool) {
+        let layout_manager: gtk4::ConstraintLayout =
+            self.layout_manager().unwrap().downcast().unwrap();
+        button.set_parent(self);
+        layout_manager.add_constraint(&gtk4::Constraint::new(
+            Some(button),
+            gtk4::ConstraintAttribute::Bottom,
+            gtk4::ConstraintRelation::Eq,
+            None::<&gtk4::Widget>,
+            gtk4::ConstraintAttribute::None,
+            1.,
+            y,
+            0,
+        ));
+        let side = if right {
+            gtk4::ConstraintAttribute::Right
+        } else {
+            gtk4::ConstraintAttribute::Left
+        };
+        layout_manager.add_constraint(&gtk4::Constraint::new(
+            Some(button),
+            side,
+            gtk4::ConstraintRelation::Eq,
+            None::<&gtk4::Widget>,
+            gtk4::ConstraintAttribute::None,
+            1.,
+            x,
+            0,
+        ));
+    }
+}
+
+static BUTTONS: &[(f64, f64, bool, Option<HardwareButton>)] = &[
+    // Middle click
+    (470., 90., true, Some(HardwareButton::Middle)),
+    // Left and right click (swapped in left handed mode)
+    (50., 140., false, None),
+    (512., 140., true, Some(HardwareButton::Right)),
+    // Scroll buttons
+    (50., 180., false, Some(HardwareButton::ScrollLeft)),
+    (512., 180., true, Some(HardwareButton::ScrollRight)),
+    // Side buttons
+    (0., 270., false, Some(HardwareButton::LeftTop)),
+    (0., 295., false, Some(HardwareButton::LeftCenter)),
+    (0., 330., false, Some(HardwareButton::LeftBottom)),
 ];
 
 #[derive(relm4::Components)]
@@ -96,7 +159,7 @@ impl AppUpdate for AppModel {
                 Event::Buttons { buttons, .. } => {
                     // Reset `self.bindings` to defaults
                     self.bindings.clear();
-                    for (_, _, id) in BUTTONS {
+                    for (_, _, _, id) in BUTTONS {
                         if let Some(id) = id {
                             self.bindings.insert(*id, id.def_binding());
                         }
@@ -220,7 +283,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             set_resource: Some("/org/pop-os/hp-mouse-configurator/mouse-dark.svg"), // XXX light?
                             set_pixel_size: 512,
                         },
-                        add_overlay: button_fixed = &gtk4::Fixed {
+                        add_overlay: buttons_widget = &ButtonsWidget {
                         }
                     },
                     append = &gtk4::Label {
@@ -288,22 +351,24 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 
     additional_fields! {
-        buttons: Vec<(Option<HardwareButton>, gtk4::Button)>,
+        buttons: Vec<(Option<HardwareButton>, gtk4::LinkButton)>,
     }
 
     fn post_init() {
         let mut buttons = Vec::new();
 
-        for (x, y, id) in BUTTONS {
+        for (x, y, right, id) in BUTTONS {
             view! {
-               button = &gtk4::Button {
+               button = &gtk4::LinkButton {
                     set_label: "Unknown",
-                    connect_clicked(sender) => move |_| {
+                    add_css_class: "mouse-button",
+                    connect_activate_link(sender) => move |_| {
                         send!(sender, AppMsg::SelectButton(*id));
+                        gtk4::Inhibit(true)
                     }
                 }
             }
-            button_fixed.put(&button, *x, *y);
+            buttons_widget.add_button(&button, *x, *y, *right);
             buttons.push((*id, button));
         }
 
@@ -331,6 +396,18 @@ relm4::new_stateless_action!(ResetConfig, ConfigActionGroup, "reset_config");
 
 fn main() {
     gio::resources_register_include!("compiled.gresource").unwrap();
+
+    gtk4::init().unwrap();
+
+    /*
+    let provider = gtk4::CssProvider::new();
+    provider.load_from_data(b"
+        .mouse-button {
+            background-color: #ff0000;
+        }
+    ");
+    gtk4::StyleContext::add_provider_for_display(&gdk::Display::default().unwrap(), &provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
+    */
 
     let model = AppModel::default();
     let app = RelmApp::new(model);
