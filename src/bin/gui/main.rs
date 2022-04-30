@@ -38,7 +38,7 @@ impl Default for ButtonsWidget {
 
 impl ButtonsWidget {
     // XXX RTL?
-    fn add_button(&self, button: &gtk4::LinkButton, x: f64, y: f64, right: bool) {
+    fn add_button(&self, button: &gtk4::Button, x: f64, y: f64, right: bool) {
         let w = IMAGE_WIDTH as f64;
         let h = w * IMAGE_RATIO;
 
@@ -355,7 +355,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 
     additional_fields! {
-        buttons: Vec<(Option<HardwareButton>, gtk4::LinkButton)>,
+        buttons: Vec<(Option<HardwareButton>, gtk4::Button)>,
     }
 
     fn post_init() {
@@ -363,12 +363,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
 
         for (x, y, right, id) in BUTTONS {
             view! {
-               button = &gtk4::LinkButton {
+               button = &gtk4::Button {
                     set_label: "Unknown",
                     add_css_class: "mouse-button",
-                    connect_activate_link(sender) => move |_| {
+                    add_css_class: "flat",
+                    connect_clicked(sender) => move |_| {
                         send!(sender, AppMsg::SelectButton(*id));
-                        gtk4::Inhibit(true)
                     }
                 }
             }
@@ -403,15 +403,20 @@ fn main() {
 
     gtk4::init().unwrap();
 
-    /*
     let provider = gtk4::CssProvider::new();
-    provider.load_from_data(b"
+    provider.load_from_data(
+        b"
         .mouse-button {
-            background-color: #ff0000;
+            /* background-color: #ff0000; */
+            padding: 0;
         }
-    ");
-    gtk4::StyleContext::add_provider_for_display(&gdk::Display::default().unwrap(), &provider, gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION);
-    */
+    ",
+    );
+    gtk4::StyleContext::add_provider_for_display(
+        &gdk::Display::default().unwrap(),
+        &provider,
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
 
     let model = AppModel::default();
     let app = RelmApp::new(model);
