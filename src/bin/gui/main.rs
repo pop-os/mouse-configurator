@@ -71,17 +71,17 @@ const IMAGE_WIDTH: i32 = 512;
 const IMAGE_RATIO: f64 = 347. / 474.; // Height/width
 static BUTTONS: &[(f64, f64, bool, Option<HardwareButton>)] = &[
     // Middle click
-    (0.9, 0.07, true, Some(HardwareButton::Middle)),
+    (0.9, 0.05, true, Some(HardwareButton::Middle)),
     // Left and right click (swapped in left handed mode)
-    (0.1, 0.2, false, None),
-    (1.0, 0.2, true, Some(HardwareButton::Right)),
+    (0.085, 0.185, false, None),
+    (0.998, 0.185, true, Some(HardwareButton::Right)),
     // Scroll buttons
-    (0.1, 0.3, false, Some(HardwareButton::ScrollLeft)),
-    (1.0, 0.3, true, Some(HardwareButton::ScrollRight)),
+    (0.1, 0.279, false, Some(HardwareButton::ScrollLeft)),
+    (0.985, 0.279, true, Some(HardwareButton::ScrollRight)),
     // Side buttons
-    (0.0, 0.5, false, Some(HardwareButton::LeftTop)),
-    (0.0, 0.6, false, Some(HardwareButton::LeftCenter)),
-    (0.0, 0.7, false, Some(HardwareButton::LeftBottom)),
+    (0.0, 0.51, false, Some(HardwareButton::LeftTop)),
+    (0.0, 0.597, false, Some(HardwareButton::LeftCenter)),
+    (0.0, 0.68, false, Some(HardwareButton::LeftBottom)),
 ];
 
 #[derive(relm4::Components)]
@@ -278,6 +278,8 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     },
                     // One element box to work around weird size allocation behavior
                     append = &gtk4::Box {
+                        set_margin_top: 6,
+                        set_margin_bottom: 6,
                         set_vexpand: false,
                         set_halign: gtk4::Align::Center,
                         append = &gtk4::Overlay {
