@@ -1,0 +1,17 @@
+on:
+  push:
+  pull_request:
+
+name: ci
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:latest
+    steps:
+    - run: apt-get update && apt-get install -y curl libgtk-4-dev libudev-dev
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+    - run: cargo test --all
+    - run: cargo fmt -- --check
