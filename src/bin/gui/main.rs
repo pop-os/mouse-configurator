@@ -8,6 +8,8 @@ mod bindings;
 use bindings::{Entry, HardwareButton};
 mod dialog;
 use dialog::{DialogModel, DialogMsg};
+mod swap_button_dialog;
+use swap_button_dialog::{SwapButtonDialogModel, SwapButtonDialogMsg};
 mod worker;
 use worker::{WorkerModel, WorkerMsg};
 
@@ -87,6 +89,7 @@ static BUTTONS: &[(f64, f64, bool, Option<HardwareButton>)] = &[
 #[derive(relm4::Components)]
 struct AppComponents {
     dialog: RelmComponent<DialogModel, AppModel>,
+    swap_button_dialog: RelmComponent<SwapButtonDialogModel, AppModel>,
     worker: RelmWorker<WorkerModel, AppModel>,
 }
 
@@ -120,6 +123,7 @@ enum AppMsg {
     SetDpi(f64),
     SetBinding(Button),
     SelectButton(Option<HardwareButton>),
+    SetLeftHanded(bool),
 }
 
 impl Model for AppModel {
@@ -205,16 +209,18 @@ impl AppUpdate for AppModel {
                 if let Some(id) = button {
                     send!(components.dialog, DialogMsg::Show(id as u8))
                 } else {
-                    // XXX dialog
                     send!(
-                        components.worker,
-                        WorkerMsg::SetLeftHanded(!self.left_handed)
+                        components.swap_button_dialog,
+                        SwapButtonDialogMsg::Show(self.left_handed)
                     );
                 }
             }
             AppMsg::SetBinding(button) => {
                 // TODO fewer layers of indirection?
                 send!(components.worker, WorkerMsg::SetBinding(button));
+            }
+            AppMsg::SetLeftHanded(left_handed) => {
+                send!(components.worker, WorkerMsg::SetLeftHanded(left_handed));
             }
         }
         true
