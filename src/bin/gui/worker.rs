@@ -1,8 +1,20 @@
-use relm4::{ComponentUpdate, Model, Sender};
-use std::thread;
+use gtk4::glib;
+use nix::{
+    errno::Errno,
+    poll::{poll, PollFd, PollFlags},
+};
+use relm4::{send, ComponentUpdate, Model, Sender};
+use std::{
+    os::unix::io::AsRawFd,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    thread,
+};
 
 use super::AppMsg;
-use hp_mouse_configurator::{enumerate, Button, HpMouse};
+use hp_mouse_configurator::{enumerate, Button, HpMouse, HpMouseEvents, ReadRes};
 
 pub enum WorkerMsg {
     DetectDevice,
@@ -53,16 +65,10 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
                     let events = mouse.read();
                     let parent_sender = parent_sender.clone();
 
-                    thread::spawn(move || {
-                        for event in events {
-                            if let Ok(event) = event {
-                                if let Err(_) = parent_sender.send(AppMsg::Event(event)) {
-                                    break;
-                                }
-                            }
-                            // XXX handle error
-                        }
-                    });
+                    let running = Arc::new(AtomicBool::new(true));
+                    thread::spawn(
+                        glib::clone!(@strong running => move || reader_thread(running, events, parent_sender)),
+                    );
 
                     self.mouse = Some(mouse);
                 }
@@ -85,6 +91,32 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
                     let _ = mouse.set_button(button, false);
                 }
             }
+        }
+    }
+}
+
+fn reader_thread(
+    running: Arc<AtomicBool>,
+    mut events: HpMouseEvents,
+    parent_sender: Sender<super::AppMsg>,
+) {
+    while running.load(Ordering::SeqCst) {
+        let fd = PollFd::new(events.as_raw_fd(), PollFlags::POLLIN);
+        match poll(&mut [fd], 200) {
+            Ok(0) | Err(Errno::EINTR) => {
+                continue;
+            }
+            Ok(_) => {}
+            Err(err) => panic!("Error polling events: {}", err),
+        }
+
+        match events.read() {
+            Ok(ReadRes::EOF) => {
+                break;
+            }
+            Ok(ReadRes::Packet(event)) => send!(parent_sender, AppMsg::Event(event)),
+            Ok(ReadRes::Continue) => {}
+            Err(_err) => {} // XXX handle error
         }
     }
 }

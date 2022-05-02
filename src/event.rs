@@ -1,5 +1,12 @@
 use bitvec::prelude::*;
-use std::{io::ErrorKind, mem, num::NonZeroU8, str, sync::Arc};
+use std::{
+    io::ErrorKind,
+    mem,
+    num::NonZeroU8,
+    os::unix::io::{AsRawFd, RawFd},
+    str,
+    sync::Arc,
+};
 
 use crate::{Button, Hid, HP_SIGNATURE};
 
@@ -354,5 +361,11 @@ impl Iterator for HpMouseEvents {
                 Err(err) => Some(Err(err)),
             };
         }
+    }
+}
+
+impl AsRawFd for HpMouseEvents {
+    fn as_raw_fd(&self) -> RawFd {
+        self.dev.as_raw_fd()
     }
 }

@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io,
-    os::unix::io::{IntoRawFd, RawFd},
+    os::unix::io::{AsRawFd, IntoRawFd, RawFd},
     path::Path,
 };
 
@@ -11,6 +11,12 @@ pub struct Hid(RawFd);
 impl Drop for Hid {
     fn drop(&mut self) {
         let _ = nix::unistd::close(self.0);
+    }
+}
+
+impl AsRawFd for Hid {
+    fn as_raw_fd(&self) -> RawFd {
+        self.0
     }
 }
 
