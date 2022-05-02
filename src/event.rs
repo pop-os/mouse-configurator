@@ -316,7 +316,10 @@ impl HpMouseEvents {
                     break len;
                 }
                 Err(err) => {
-                    if err.kind() != ErrorKind::Interrupted {
+                    if err.raw_os_error() == Some(libc::EIO) {
+                        // Error when device is disconnected
+                        return Ok(ReadRes::EOF);
+                    } else if err.kind() != ErrorKind::Interrupted {
                         return Err(err.to_string());
                     }
                 }

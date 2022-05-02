@@ -17,6 +17,7 @@ use super::AppMsg;
 use hp_mouse_configurator::{enumerate, Button, HpMouse, HpMouseEvents, ReadRes};
 
 pub enum WorkerMsg {
+    Disconnect,
     DetectDevice,
     SetDpi(u16),
     SetLeftHanded(bool),
@@ -50,10 +51,13 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
         &mut self,
         msg: WorkerMsg,
         _components: &(),
-        _sender: Sender<WorkerMsg>,
+        sender: Sender<WorkerMsg>,
         parent_sender: Sender<super::AppMsg>,
     ) {
         match msg {
+            WorkerMsg::Disconnect => {
+                eprintln!("End reader");
+            }
             WorkerMsg::DetectDevice => {
                 if let Some(mouse) = detect_device() {
                     // XXX errors
@@ -63,11 +67,9 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
                     let _ = mouse.query_dpi();
 
                     let events = mouse.read();
-                    let parent_sender = parent_sender.clone();
-
                     let running = Arc::new(AtomicBool::new(true));
                     thread::spawn(
-                        glib::clone!(@strong running => move || reader_thread(running, events, parent_sender)),
+                        glib::clone!(@strong running => move || reader_thread(running, events, sender, parent_sender)),
                     );
 
                     self.mouse = Some(mouse);
@@ -98,6 +100,7 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
 fn reader_thread(
     running: Arc<AtomicBool>,
     mut events: HpMouseEvents,
+    sender: Sender<WorkerMsg>,
     parent_sender: Sender<super::AppMsg>,
 ) {
     while running.load(Ordering::SeqCst) {
@@ -116,7 +119,9 @@ fn reader_thread(
             }
             Ok(ReadRes::Packet(event)) => send!(parent_sender, AppMsg::Event(event)),
             Ok(ReadRes::Continue) => {}
-            Err(_err) => {} // XXX handle error
+            Err(err) => eprintln!("Error reading event: {}", err), // XXX handle error
         }
     }
+
+    send!(sender, WorkerMsg::Disconnect);
 }
