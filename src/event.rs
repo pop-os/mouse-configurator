@@ -1,5 +1,5 @@
 use bitvec::prelude::*;
-use std::{mem, num::NonZeroU8, str, sync::Arc};
+use std::{io::ErrorKind, mem, num::NonZeroU8, str, sync::Arc};
 
 use crate::{Button, Hid, HP_SIGNATURE};
 
@@ -300,13 +300,23 @@ impl HpMouseEvents {
     pub fn read(&mut self) -> Result<ReadRes, String> {
         let mut buf = [0; 4096];
 
-        let len = self.dev.read(&mut buf).map_err(|x| x.to_string())?;
+        let len = loop {
+            match self.dev.read(&mut buf) {
+                Ok(0) => {
+                    return Ok(ReadRes::EOF);
+                }
+                Ok(len) => {
+                    break len;
+                }
+                Err(err) => {
+                    if err.kind() != ErrorKind::Interrupted {
+                        return Err(err.to_string());
+                    }
+                }
+            }
+        };
+
         eprintln!("HID read {}", len);
-
-        if len == 0 {
-            return Ok(ReadRes::EOF);
-        }
-
         for i in 0..len {
             eprint!(" {:02x}", buf[i]);
         }
