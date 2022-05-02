@@ -74,13 +74,13 @@ pub enum Event {
     },
 }
 
-pub struct HpMouseEventIterator {
+pub struct HpMouseEvents {
     dev: Arc<Hid>,
     incoming: Vec<u8>,
     header: Header,
 }
 
-impl HpMouseEventIterator {
+impl HpMouseEvents {
     pub(crate) fn new(dev: Arc<Hid>) -> Self {
         Self {
             dev,
@@ -296,43 +296,53 @@ impl HpMouseEventIterator {
         // No full packet yet
         Ok(None)
     }
+
+    pub fn read(&mut self) -> Result<ReadRes, String> {
+        let mut buf = [0; 4096];
+
+        let len = self.dev.read(&mut buf).map_err(|x| x.to_string())?;
+        eprintln!("HID read {}", len);
+
+        if len == 0 {
+            return Ok(ReadRes::EOF);
+        }
+
+        for i in 0..len {
+            eprint!(" {:02x}", buf[i]);
+        }
+        eprintln!();
+
+        match buf[0] {
+            1 => {
+                if let Some(packet) = self.report_1(&buf[1..len])? {
+                    return Ok(ReadRes::Packet(packet));
+                }
+            }
+            _ => {}
+        }
+        Ok(ReadRes::Continue)
+    }
 }
 
-impl Iterator for HpMouseEventIterator {
+pub enum ReadRes {
+    Packet(Event),
+    Continue,
+    EOF,
+}
+
+impl Iterator for HpMouseEvents {
     type Item = Result<Event, String>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut buf = [0; 4096];
         loop {
-            let len = match self.dev.read(&mut buf) {
-                Ok(len) => len,
-                Err(err) => {
-                    return Some(Err(err.to_string()));
+            return match self.read() {
+                Ok(ReadRes::Continue) => {
+                    continue;
                 }
+                Ok(ReadRes::Packet(event)) => Some(Ok(event)),
+                Ok(ReadRes::EOF) => None,
+                Err(err) => Some(Err(err)),
             };
-            eprintln!("HID read {}", len);
-
-            if len == 0 {
-                return None;
-            }
-
-            for i in 0..len {
-                eprint!(" {:02x}", buf[i]);
-            }
-            eprintln!();
-
-            match buf[0] {
-                1 => match self.report_1(&buf[1..len]) {
-                    Ok(Some(event)) => {
-                        return Some(Ok(event));
-                    }
-                    Ok(None) => {}
-                    Err(err) => {
-                        return Some(Err(err));
-                    }
-                },
-                _ => {}
-            }
         }
     }
 }

@@ -5,7 +5,7 @@ pub use button::{Button, Op, Value};
 mod enumerate;
 pub use enumerate::enumerate;
 mod event;
-pub use event::{Event, HpMouseEventIterator};
+pub use event::{Event, HpMouseEvents, ReadRes};
 mod hid;
 use hid::Hid;
 
@@ -116,7 +116,7 @@ impl HpMouse {
     }
 
     // Using multiple readers will result in inconsistent behavior
-    pub fn read(&self) -> HpMouseEventIterator {
-        HpMouseEventIterator::new(self.dev.clone())
+    pub fn read(&self) -> HpMouseEvents {
+        HpMouseEvents::new(self.dev.clone())
     }
 }
