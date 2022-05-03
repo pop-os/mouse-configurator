@@ -64,6 +64,7 @@ impl WorkerModel {
         let _ = mouse.query_dpi();
 
         let device_id = self.next_device_id.clone();
+        send!(parent_sender, super::AppMsg::DeviceAdded(device_id.clone()));
 
         let events = mouse.read();
         let running = Arc::new(AtomicBool::new(true));
@@ -72,8 +73,6 @@ impl WorkerModel {
                 reader_thread(device_id, running, events, sender, parent_sender)
             }),
         );
-
-        send!(parent_sender, super::AppMsg::DeviceAdded(device_id));
 
         self.devices
             .insert(self.next_device_id.clone(), (device.devnode, mouse));

@@ -94,23 +94,44 @@ struct AppComponents {
 }
 
 #[derive(Default)]
-struct AppModel {
+struct Device {
     battery_percent: u8,
     dpi: Option<f64>,
     dpi_step: f64,
     bindings: HashMap<HardwareButton, &'static Entry>,
     left_handed: bool,
-    bindings_changed: bool,
+}
+
+#[derive(Default)]
+struct AppModel {
+    devices: HashMap<DeviceId, Device>,
     device_id: Option<DeviceId>,
+    bindings_changed: bool,
 }
 
 impl AppModel {
+    fn device(&self) -> Option<&Device> {
+        self.devices.get(self.device_id.as_ref()?)
+    }
+
+    fn device_mut(&mut self) -> Option<&mut Device> {
+        self.devices.get_mut(self.device_id.as_ref()?)
+    }
+
+    fn dpi(&self) -> Option<f64> {
+        self.device()?.dpi
+    }
+
     // Swap left and right buttons, if in left handed mode
     fn swap_buttons(&self, button: Option<HardwareButton>) -> Option<HardwareButton> {
-        if self.left_handed && button.is_none() {
-            Some(HardwareButton::Right)
-        } else if self.left_handed && button == Some(HardwareButton::Right) {
-            None
+        if let Some(device) = self.device() {
+            if device.left_handed && button.is_none() {
+                Some(HardwareButton::Right)
+            } else if device.left_handed && button == Some(HardwareButton::Right) {
+                None
+            } else {
+                button
+            }
         } else {
             button
         }
@@ -138,7 +159,8 @@ impl Model for AppModel {
 
 impl AppModel {
     fn round_dpi(&self, dpi: f64) -> u16 {
-        ((dpi / self.dpi_step).round() * self.dpi_step) as u16
+        let dpi_step = self.device().map_or(1., |x| x.dpi_step);
+        ((dpi / dpi_step).round() * dpi_step) as u16
     }
 }
 
@@ -152,32 +174,46 @@ impl AppUpdate for AppModel {
                 send!(components.worker, WorkerMsg::DetectDevices);
             }
             AppMsg::DeviceAdded(id) => {
+                self.devices.insert(id.clone(), Device::default());
                 self.device_id = Some(id); // XXX
+                self.bindings_changed = true;
             }
             AppMsg::DeviceRemoved(id) => {
-                self.device_id = None; // XXX
+                self.devices.remove(&id);
+                if self.device_id == Some(id) {
+                    self.device_id = None;
+                }
+                self.bindings_changed = true;
             }
             AppMsg::Event(device_id, event) => match event {
-                Event::Battery { level, .. } => self.battery_percent = level,
+                Event::Battery { level, .. } => {
+                    let device = self.devices.get_mut(&device_id).unwrap();
+                    device.battery_percent = level;
+                }
                 Event::Mouse {
                     dpi,
                     step_dpi,
                     left_handed,
                     ..
                 } => {
-                    if self.dpi.is_none() {
-                        self.dpi = Some(dpi.into());
-                        self.dpi_step = step_dpi.into();
+                    let device = self.devices.get_mut(&device_id).unwrap();
+                    if device.dpi.is_none() {
+                        device.dpi = Some(dpi.into());
+                        device.dpi_step = step_dpi.into();
                     }
-                    self.left_handed = left_handed;
-                    self.bindings_changed = true;
+                    device.left_handed = left_handed;
+
+                    if self.device_id == Some(device_id) {
+                        self.bindings_changed = true;
+                    }
                 }
                 Event::Buttons { buttons, .. } => {
+                    let bindings = &mut self.devices.get_mut(&device_id).unwrap().bindings;
                     // Reset `self.bindings` to defaults
-                    self.bindings.clear();
+                    bindings.clear();
                     for (_, _, _, id) in BUTTONS {
                         if let Some(id) = id {
-                            self.bindings.insert(*id, id.def_binding());
+                            bindings.insert(*id, id.def_binding());
                         }
                     }
 
@@ -192,9 +228,9 @@ impl AppUpdate for AppModel {
                         match button.decode_action() {
                             Ok(action) => {
                                 if let Some(entry) = Entry::for_binding(&action) {
-                                    self.bindings.insert(id, entry);
+                                    bindings.insert(id, entry);
                                 } else {
-                                    self.bindings.remove(&id);
+                                    bindings.remove(&id);
                                     eprintln!("Unrecognized action: {:?}", action);
                                 }
                             }
@@ -204,30 +240,35 @@ impl AppUpdate for AppModel {
                         }
                     }
 
-                    self.bindings_changed = true;
+                    if self.device_id == Some(device_id) {
+                        self.bindings_changed = true;
+                    }
                 }
                 Event::Firmware { .. } => {}
                 _ => {}
             },
             AppMsg::SetDpi(value) => {
                 let new = self.round_dpi(value);
-                let old = self.dpi.map(|value| self.round_dpi(value));
+                let old = self.dpi().map(|value| self.round_dpi(value));
                 if old != Some(new) {
                     // XXX don't queue infinitely?
                     if let Some(device_id) = self.device_id.clone() {
                         send!(components.worker, WorkerMsg::SetDpi(device_id, new));
                     }
                 }
-                self.dpi = Some(value);
+                if let Some(device) = self.device_mut() {
+                    device.dpi = Some(value);
+                }
             }
             AppMsg::SelectButton(button) => {
                 let button = self.swap_buttons(button);
                 if let Some(id) = button {
                     send!(components.dialog, DialogMsg::Show(id as u8))
                 } else {
+                    let left_handed = self.device().map_or(false, |x| x.left_handed);
                     send!(
                         components.swap_button_dialog,
-                        SwapButtonDialogMsg::Show(self.left_handed)
+                        SwapButtonDialogMsg::Show(left_handed)
                     );
                 }
             }
@@ -306,7 +347,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                     set_from_icon_name: Some("battery-symbolic"),
                                 },
                                 append = &gtk4::Label {
-                                    set_label: watch! { &format!("{}%", model.battery_percent) }
+                                    set_label: watch! { &format!("{}%", model.device().map_or(0, |x| x.battery_percent)) }
                                 },
                             },
                             append = &gtk4::Box {
@@ -363,7 +404,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                         append = &gtk4::ListBox {
                             add_css_class: "frame",
                             append = &gtk4::ListBoxRow {
-                                set_sensitive: watch! { model.dpi.is_some() },
+                                set_sensitive: watch! { model.dpi().is_some() },
                                 set_selectable: false,
                                 set_activatable: false,
                                 set_child = Some(&gtk4::Box) {
@@ -385,12 +426,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                         }
                                     },
                                     append = &gtk4::Label {
-                                        set_label: watch! { &model.dpi.map_or_else(String::new, |dpi| format!("{}", model.round_dpi(dpi))) },
+                                        set_label: watch! { &model.dpi().map_or_else(String::new, |dpi| format!("{}", model.round_dpi(dpi))) },
                                     },
                                     append: dpi_scale = &gtk4::Scale {
                                         set_hexpand: true,
                                         set_adjustment: &gtk4::Adjustment::new(800., 800., 3000., 50., 50., 0.), // XXX don't hard-code? XXX 800?
-                                        set_value: watch! { model.dpi.unwrap_or(0.) },
+                                        set_value: watch! { model.dpi().unwrap_or(0.) },
                                         connect_change_value(sender) => move |_, _, value| {
                                             send!(sender, AppMsg::SetDpi(value));
                                             gtk4::Inhibit(false)
@@ -453,9 +494,14 @@ impl Widgets<AppModel, ()> for AppWidgets {
         });
 
         if model.bindings_changed {
+            let bindings = model.device().map(|x| &x.bindings);
             for (id, button) in &self.buttons {
                 if let Some(id) = model.swap_buttons(*id) {
-                    button.set_label(model.bindings.get(&id).map_or("Unknown", |x| x.label));
+                    button.set_label(
+                        bindings
+                            .and_then(|x| x.get(&id))
+                            .map_or("Unknown", |x| x.label),
+                    );
                 } else {
                     button.set_label("Left Click");
                 }
