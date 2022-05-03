@@ -5,7 +5,9 @@ use nix::{
 };
 use relm4::{send, ComponentUpdate, Model, Sender};
 use std::{
+    collections::HashMap,
     os::unix::io::AsRawFd,
+    path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
@@ -14,18 +16,24 @@ use std::{
 };
 
 use super::AppMsg;
-use hp_mouse_configurator::{enumerate, Button, HpMouse, HpMouseEvents, ReadRes};
+use hp_mouse_configurator::{enumerate, Button, DeviceInfo, HpMouse, HpMouseEvents, ReadRes};
+
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct DeviceId(usize);
+
+// XXX periodically poll for devices? what is done in keyboard configurator?
 
 pub enum WorkerMsg {
-    Disconnect,
-    DetectDevice,
+    Disconnect(DeviceId),
+    DetectDevices,
     SetDpi(u16),
     SetLeftHanded(bool),
     SetBinding(Button),
 }
 
 pub struct WorkerModel {
-    mouse: Option<HpMouse>,
+    next_device_id: DeviceId,
+    devices: HashMap<DeviceId, (PathBuf, HpMouse)>, // associate with udev device?
 }
 
 impl Model for WorkerModel {
@@ -34,17 +42,51 @@ impl Model for WorkerModel {
     type Components = ();
 }
 
-fn detect_device() -> Option<HpMouse> {
-    for device in enumerate().ok()? {
-        eprintln!("Found device: {:?}", device);
-        return device.open().ok();
+impl WorkerModel {
+    fn add_device(
+        &mut self,
+        device: DeviceInfo,
+        sender: &Sender<WorkerMsg>,
+        parent_sender: &Sender<super::AppMsg>,
+    ) {
+        let mouse = match device.open() {
+            Ok(mouse) => mouse,
+            Err(err) => {
+                eprintln!("Error opening device: {}", err);
+                return;
+            }
+        };
+
+        // XXX errors
+        let _ = mouse.query_firmware();
+        let _ = mouse.query_battery();
+        let _ = mouse.query_button();
+        let _ = mouse.query_dpi();
+
+        let device_id = self.next_device_id.clone();
+
+        let events = mouse.read();
+        let running = Arc::new(AtomicBool::new(true));
+        thread::spawn(
+            glib::clone!(@strong device_id, @strong running, @strong sender, @strong parent_sender => move || {
+                reader_thread(device_id, running, events, sender, parent_sender)
+            }),
+        );
+
+        send!(parent_sender, super::AppMsg::DeviceAdded(device_id));
+
+        self.devices
+            .insert(self.next_device_id.clone(), (device.devnode, mouse));
+        self.next_device_id.0 += 1;
     }
-    None
 }
 
 impl ComponentUpdate<super::AppModel> for WorkerModel {
     fn init_model(_parent_model: &super::AppModel) -> Self {
-        WorkerModel { mouse: None }
+        WorkerModel {
+            next_device_id: DeviceId(0),
+            devices: HashMap::new(),
+        }
     }
 
     fn update(
@@ -55,40 +97,40 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
         parent_sender: Sender<super::AppMsg>,
     ) {
         match msg {
-            WorkerMsg::Disconnect => {
+            WorkerMsg::Disconnect(id) => {
+                self.devices.remove(&id);
+                send!(parent_sender, super::AppMsg::DeviceRemoved(id));
                 eprintln!("End reader");
             }
-            WorkerMsg::DetectDevice => {
-                if let Some(mouse) = detect_device() {
-                    // XXX errors
-                    let _ = mouse.query_firmware();
-                    let _ = mouse.query_battery();
-                    let _ = mouse.query_button();
-                    let _ = mouse.query_dpi();
-
-                    let events = mouse.read();
-                    let running = Arc::new(AtomicBool::new(true));
-                    thread::spawn(
-                        glib::clone!(@strong running => move || reader_thread(running, events, sender, parent_sender)),
-                    );
-
-                    self.mouse = Some(mouse);
+            WorkerMsg::DetectDevices => match enumerate() {
+                Ok(devices) => {
+                    for device in devices {
+                        if !self
+                            .devices
+                            .values()
+                            .any(|(devnode, _)| devnode == &device.devnode)
+                        {
+                            eprintln!("Found device: {:?}", device);
+                            self.add_device(device, &sender, &parent_sender);
+                        }
+                    }
                 }
-            }
+                Err(err) => eprintln!("Error enumerating devices: {}", err),
+            },
             WorkerMsg::SetDpi(value) => {
-                if let Some(mouse) = &self.mouse {
+                if let Some((_, mouse)) = &self.devices.get(&DeviceId(0)) {
                     // XXX error
                     let _ = mouse.set_dpi(value);
                 }
             }
             WorkerMsg::SetLeftHanded(value) => {
-                if let Some(mouse) = &self.mouse {
+                if let Some((_, mouse)) = &self.devices.get(&DeviceId(0)) {
                     // XXX error
                     let _ = mouse.set_left_handed(value);
                 }
             }
             WorkerMsg::SetBinding(button) => {
-                if let Some(mouse) = &self.mouse {
+                if let Some((_, mouse)) = &self.devices.get(&DeviceId(0)) {
                     // XXX error
                     let _ = mouse.set_button(button, false);
                 }
@@ -98,6 +140,7 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
 }
 
 fn reader_thread(
+    device_id: DeviceId,
     running: Arc<AtomicBool>,
     mut events: HpMouseEvents,
     sender: Sender<WorkerMsg>,
@@ -123,5 +166,5 @@ fn reader_thread(
         }
     }
 
-    send!(sender, WorkerMsg::Disconnect);
+    send!(sender, WorkerMsg::Disconnect(device_id));
 }

@@ -11,7 +11,7 @@ use dialog::{DialogModel, DialogMsg};
 mod swap_button_dialog;
 use swap_button_dialog::{SwapButtonDialogModel, SwapButtonDialogMsg};
 mod worker;
-use worker::{WorkerModel, WorkerMsg};
+use worker::{DeviceId, WorkerModel, WorkerMsg};
 
 #[derive(Default)]
 pub struct ButtonsWidgetInner;
@@ -95,13 +95,13 @@ struct AppComponents {
 
 #[derive(Default)]
 struct AppModel {
-    has_device: bool,
     battery_percent: u8,
     dpi: Option<f64>,
     dpi_step: f64,
     bindings: HashMap<HardwareButton, &'static Entry>,
     left_handed: bool,
     bindings_changed: bool,
+    device_id: Option<DeviceId>,
 }
 
 impl AppModel {
@@ -118,6 +118,9 @@ impl AppModel {
 }
 
 enum AppMsg {
+    Refresh,
+    DeviceAdded(DeviceId),
+    DeviceRemoved(DeviceId),
     #[allow(unused)]
     RenameConfig,
     Event(Event),
@@ -145,6 +148,15 @@ impl AppUpdate for AppModel {
 
         match msg {
             AppMsg::RenameConfig => {}
+            AppMsg::Refresh => {
+                send!(components.worker, WorkerMsg::DetectDevices);
+            }
+            AppMsg::DeviceAdded(id) => {
+                self.device_id = Some(id); // XXX
+            }
+            AppMsg::DeviceRemoved(id) => {
+                self.device_id = None; // XXX
+            }
             AppMsg::Event(event) => match event {
                 Event::Battery { level, .. } => self.battery_percent = level,
                 Event::Mouse {
@@ -194,9 +206,7 @@ impl AppUpdate for AppModel {
 
                     self.bindings_changed = true;
                 }
-                Event::Firmware { .. } => {
-                    self.has_device = true;
-                }
+                Event::Firmware { .. } => {}
                 _ => {}
             },
             AppMsg::SetDpi(value) => {
@@ -417,11 +427,17 @@ impl Widgets<AppModel, ()> for AppWidgets {
             buttons.push((*id, button));
         }
 
-        let _ = components.worker.send(WorkerMsg::DetectDevice);
+        send!(sender, AppMsg::Refresh);
+        glib::timeout_add_seconds_local(
+            1,
+            glib::clone!(@strong sender => move || {
+                glib::Continue(sender.send(AppMsg::Refresh).is_ok())
+            }),
+        );
     }
 
     fn post_view() {
-        self.stack.set_visible_child(if model.has_device {
+        self.stack.set_visible_child(if model.device_id.is_some() {
             &self.device_page
         } else {
             &self.no_device_page

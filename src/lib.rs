@@ -3,7 +3,7 @@ use std::{io, path::Path, sync::Arc};
 pub mod button;
 pub use button::{Button, Op, Value};
 mod enumerate;
-pub use enumerate::enumerate;
+pub use enumerate::{enumerate, DeviceInfo};
 mod event;
 pub use event::{Event, HpMouseEvents, ReadRes};
 mod hid;
