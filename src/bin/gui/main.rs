@@ -123,7 +123,7 @@ enum AppMsg {
     DeviceRemoved(DeviceId),
     #[allow(unused)]
     RenameConfig,
-    Event(Event),
+    Event(DeviceId, Event),
     SetDpi(f64),
     SetBinding(Button),
     SelectButton(Option<HardwareButton>),
@@ -157,7 +157,7 @@ impl AppUpdate for AppModel {
             AppMsg::DeviceRemoved(id) => {
                 self.device_id = None; // XXX
             }
-            AppMsg::Event(event) => match event {
+            AppMsg::Event(device_id, event) => match event {
                 Event::Battery { level, .. } => self.battery_percent = level,
                 Event::Mouse {
                     dpi,
@@ -214,7 +214,9 @@ impl AppUpdate for AppModel {
                 let old = self.dpi.map(|value| self.round_dpi(value));
                 if old != Some(new) {
                     // XXX don't queue infinitely?
-                    send!(components.worker, WorkerMsg::SetDpi(new));
+                    if let Some(device_id) = self.device_id.clone() {
+                        send!(components.worker, WorkerMsg::SetDpi(device_id, new));
+                    }
                 }
                 self.dpi = Some(value);
             }
@@ -231,10 +233,17 @@ impl AppUpdate for AppModel {
             }
             AppMsg::SetBinding(button) => {
                 // TODO fewer layers of indirection?
-                send!(components.worker, WorkerMsg::SetBinding(button));
+                if let Some(device_id) = self.device_id.clone() {
+                    send!(components.worker, WorkerMsg::SetBinding(device_id, button));
+                }
             }
             AppMsg::SetLeftHanded(left_handed) => {
-                send!(components.worker, WorkerMsg::SetLeftHanded(left_handed));
+                if let Some(device_id) = self.device_id.clone() {
+                    send!(
+                        components.worker,
+                        WorkerMsg::SetLeftHanded(device_id, left_handed)
+                    );
+                }
             }
         }
         true

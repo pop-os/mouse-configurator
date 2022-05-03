@@ -26,9 +26,9 @@ pub struct DeviceId(usize);
 pub enum WorkerMsg {
     Disconnect(DeviceId),
     DetectDevices,
-    SetDpi(u16),
-    SetLeftHanded(bool),
-    SetBinding(Button),
+    SetDpi(DeviceId, u16),
+    SetLeftHanded(DeviceId, bool),
+    SetBinding(DeviceId, Button),
 }
 
 pub struct WorkerModel {
@@ -117,20 +117,20 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
                 }
                 Err(err) => eprintln!("Error enumerating devices: {}", err),
             },
-            WorkerMsg::SetDpi(value) => {
-                if let Some((_, mouse)) = &self.devices.get(&DeviceId(0)) {
+            WorkerMsg::SetDpi(id, value) => {
+                if let Some((_, mouse)) = &self.devices.get(&id) {
                     // XXX error
                     let _ = mouse.set_dpi(value);
                 }
             }
-            WorkerMsg::SetLeftHanded(value) => {
-                if let Some((_, mouse)) = &self.devices.get(&DeviceId(0)) {
+            WorkerMsg::SetLeftHanded(id, value) => {
+                if let Some((_, mouse)) = &self.devices.get(&id) {
                     // XXX error
                     let _ = mouse.set_left_handed(value);
                 }
             }
-            WorkerMsg::SetBinding(button) => {
-                if let Some((_, mouse)) = &self.devices.get(&DeviceId(0)) {
+            WorkerMsg::SetBinding(id, button) => {
+                if let Some((_, mouse)) = &self.devices.get(&id) {
                     // XXX error
                     let _ = mouse.set_button(button, false);
                 }
@@ -160,7 +160,9 @@ fn reader_thread(
             Ok(ReadRes::EOF) => {
                 break;
             }
-            Ok(ReadRes::Packet(event)) => send!(parent_sender, AppMsg::Event(event)),
+            Ok(ReadRes::Packet(event)) => {
+                send!(parent_sender, AppMsg::Event(device_id.clone(), event))
+            }
             Ok(ReadRes::Continue) => {}
             Err(err) => eprintln!("Error reading event: {}", err), // XXX handle error
         }
