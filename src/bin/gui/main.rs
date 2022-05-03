@@ -1,6 +1,6 @@
 use gtk4::{gdk, gdk_pixbuf, gio, glib, pango, prelude::*, subclass::prelude::*};
 use relm4::{send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets};
-use std::collections::HashMap;
+use std::{collections::HashMap, process::Command};
 
 use hp_mouse_configurator::{Button, Event};
 
@@ -95,6 +95,7 @@ struct AppComponents {
 
 #[derive(Default)]
 struct AppModel {
+    has_device: bool,
     battery_percent: u8,
     dpi: Option<f64>,
     dpi_step: f64,
@@ -193,6 +194,9 @@ impl AppUpdate for AppModel {
 
                     self.bindings_changed = true;
                 }
+                Event::Firmware { .. } => {
+                    self.has_device = true;
+                }
                 _ => {}
             },
             AppMsg::SetDpi(value) => {
@@ -235,114 +239,143 @@ impl Widgets<AppModel, ()> for AppWidgets {
             set_default_size: args!(1280, 768),
             set_child = Some(&gtk4::ScrolledWindow) {
                 set_hscrollbar_policy: gtk4::PolicyType::Never,
-                set_child = Some(&gtk4::Box) {
-                    set_orientation: gtk4::Orientation::Vertical,
-                    set_spacing: 6,
-                    set_halign: gtk4::Align::Center,
-                    set_hexpand: false,
-                    set_margin_start: 12,
-                    set_margin_end: 12,
-                    set_margin_top: 12,
-                    set_margin_bottom: 12,
-                    append = &gtk4::Box {
-                        set_orientation: gtk4::Orientation::Horizontal,
+                set_child: stack = Some(&gtk4::Stack) {
+                    add_child: no_device_page = &gtk4::Box {
+                        set_orientation: gtk4::Orientation::Vertical,
                         set_halign: gtk4::Align::Center,
-                        set_spacing: 12,
+                        set_valign: gtk4::Align::Center,
+                        set_spacing: 6,
+                        append = &gtk4::Image {
+                            set_icon_name: Some("input-mouse-symbolic"),
+                            set_pixel_size: 128,
+                        },
+                        append = &gtk4::Label {
+                            set_label: "No Mouse Detected",
+                            set_attributes = Some(&pango::AttrList) {
+                                insert: pango::AttrInt::new_weight(pango::Weight::Bold),
+                                insert: pango::AttrFloat::new_scale(pango::SCALE_LARGE)
+                            },
+                        },
+                        append = &gtk4::Label {
+                            set_label: "If using USB connection, make sure it is plugged in properly.",
+                        },
+                        append = &gtk4::LinkButton {
+                            set_label: "Check Bluetooth Settings",
+                            connect_activate_link => |_| {
+                                let _ = Command::new("gnome-control-center").arg("bluetooth").spawn();
+                                gtk4::Inhibit(true)
+                            }
+                        }
+                    },
+                    add_child: device_page = &gtk4::Box {
+                        set_orientation: gtk4::Orientation::Vertical,
+                        set_spacing: 6,
+                        set_halign: gtk4::Align::Center,
+                        set_hexpand: false,
+                        set_margin_start: 12,
+                        set_margin_end: 12,
+                        set_margin_top: 12,
+                        set_margin_bottom: 12,
                         append = &gtk4::Box {
                             set_orientation: gtk4::Orientation::Horizontal,
-                            set_spacing: 6,
-                            append = &gtk4::Image {
-                                set_from_icon_name: Some("battery-symbolic"),
+                            set_halign: gtk4::Align::Center,
+                            set_spacing: 12,
+                            append = &gtk4::Box {
+                                set_orientation: gtk4::Orientation::Horizontal,
+                                set_spacing: 6,
+                                append = &gtk4::Image {
+                                    set_from_icon_name: Some("battery-symbolic"),
+                                },
+                                append = &gtk4::Label {
+                                    set_label: watch! { &format!("{}%", model.battery_percent) }
+                                },
                             },
-                            append = &gtk4::Label {
-                                set_label: watch! { &format!("{}%", model.battery_percent) }
+                            append = &gtk4::Box {
+                                set_orientation: gtk4::Orientation::Horizontal,
+                                set_spacing: 6,
+                                append = &gtk4::Image {
+                                    set_from_icon_name: Some("help-info-symbolic"),
+                                },
+                                append = &gtk4::Label {
+                                    set_label: "About This Mouse",
+                                }
                             },
                         },
                         append = &gtk4::Box {
                             set_orientation: gtk4::Orientation::Horizontal,
-                            set_spacing: 6,
-                            append = &gtk4::Image {
-                                set_from_icon_name: Some("help-info-symbolic"),
-                            },
                             append = &gtk4::Label {
-                                set_label: "About This Mouse",
+                                set_label: "Configuration",
+                            },
+                            append = &gtk4::DropDown {
+                                set_hexpand: true,
+                            },
+                            append = &gtk4::MenuButton {
+                                set_menu_model: Some(&config_menu),
+                                set_icon_name: "view-more-symbolic"
                             }
                         },
-                    },
-                    append = &gtk4::Box {
-                        set_orientation: gtk4::Orientation::Horizontal,
+                        // One element box to work around weird size allocation behavior
+                        append = &gtk4::Box {
+                            set_margin_top: 6,
+                            set_margin_bottom: 6,
+                            set_vexpand: false,
+                            set_halign: gtk4::Align::Center,
+                            append = &gtk4::Overlay {
+                                set_child = Some(&gtk4::Picture) {
+                                    set_pixbuf: Some(&gdk_pixbuf::Pixbuf::from_resource_at_scale("/org/pop-os/hp-mouse-configurator/mouse-dark.svg", IMAGE_WIDTH, -1, true).unwrap()), // XXX light
+                                    set_can_shrink: false,
+                                },
+                                add_overlay: buttons_widget = &ButtonsWidget {
+                                },
+                                set_measure_overlay: args!(&buttons_widget, false),
+                            }
+                        },
                         append = &gtk4::Label {
-                            set_label: "Configuration",
+                            set_label: "Select a button to change its binding. Your settings are automatically saved to firmware.",
+                            set_margin_bottom: 12,
                         },
-                        append = &gtk4::DropDown {
-                            set_hexpand: true,
-                        },
-                        append = &gtk4::MenuButton {
-                            set_menu_model: Some(&config_menu),
-                            set_icon_name: "view-more-symbolic"
-                        }
-                    },
-                    // One element box to work around weird size allocation behavior
-                    append = &gtk4::Box {
-                        set_margin_top: 6,
-                        set_margin_bottom: 6,
-                        set_vexpand: false,
-                        set_halign: gtk4::Align::Center,
-                        append = &gtk4::Overlay {
-                            set_child = Some(&gtk4::Picture) {
-                                set_pixbuf: Some(&gdk_pixbuf::Pixbuf::from_resource_at_scale("/org/pop-os/hp-mouse-configurator/mouse-dark.svg", IMAGE_WIDTH, -1, true).unwrap()), // XXX light
-                                set_can_shrink: false,
+                        append = &gtk4::Label {
+                            set_label: "Sensitivity",
+                            set_attributes = Some(&pango::AttrList) {
+                                insert: pango::AttrInt::new_weight(pango::Weight::Bold)
                             },
-                            add_overlay: buttons_widget = &ButtonsWidget {
-                            },
-                            set_measure_overlay: args!(&buttons_widget, false),
-                        }
-                    },
-                    append = &gtk4::Label {
-                        set_label: "Select a button to change its binding. Your settings are automatically saved to firmware.",
-                        set_margin_bottom: 12,
-                    },
-                    append = &gtk4::Label {
-                        set_label: "Sensitivity",
-                        set_attributes = Some(&pango::AttrList) {
-                            insert: pango::AttrInt::new_weight(pango::Weight::Bold)
+                            set_halign: gtk4::Align::Start
                         },
-                        set_halign: gtk4::Align::Start
-                    },
-                    append = &gtk4::ListBox {
-                        add_css_class: "frame",
-                        append = &gtk4::ListBoxRow {
-                            set_sensitive: watch! { model.dpi.is_some() },
-                            set_selectable: false,
-                            set_activatable: false,
-                            set_child = Some(&gtk4::Box) {
-                                set_orientation: gtk4::Orientation::Horizontal,
-                                append = &gtk4::Box {
-                                    set_margin_top: 6,
-                                    set_margin_bottom: 6,
-                                    set_margin_start: 6,
-                                    set_margin_end: 6,
-                                    set_orientation: gtk4::Orientation::Vertical,
-                                    append = &gtk4::Label {
-                                        set_label: "Mouse Cursor Speed",
-                                        set_attributes = Some(&pango::AttrList) {
-                                            insert: pango::AttrInt::new_weight(pango::Weight::Bold)
+                        append = &gtk4::ListBox {
+                            add_css_class: "frame",
+                            append = &gtk4::ListBoxRow {
+                                set_sensitive: watch! { model.dpi.is_some() },
+                                set_selectable: false,
+                                set_activatable: false,
+                                set_child = Some(&gtk4::Box) {
+                                    set_orientation: gtk4::Orientation::Horizontal,
+                                    append = &gtk4::Box {
+                                        set_margin_top: 6,
+                                        set_margin_bottom: 6,
+                                        set_margin_start: 6,
+                                        set_margin_end: 6,
+                                        set_orientation: gtk4::Orientation::Vertical,
+                                        append = &gtk4::Label {
+                                            set_label: "Mouse Cursor Speed",
+                                            set_attributes = Some(&pango::AttrList) {
+                                                insert: pango::AttrInt::new_weight(pango::Weight::Bold)
+                                            }
+                                        },
+                                        append = &gtk4::Label {
+                                            set_label: "Sensitivity (DPI)",
                                         }
                                     },
                                     append = &gtk4::Label {
-                                        set_label: "Sensitivity (DPI)",
-                                    }
-                                },
-                                append = &gtk4::Label {
-                                    set_label: watch! { &model.dpi.map_or_else(String::new, |dpi| format!("{}", model.round_dpi(dpi))) },
-                                },
-                                append: dpi_scale = &gtk4::Scale {
-                                    set_hexpand: true,
-                                    set_adjustment: &gtk4::Adjustment::new(800., 800., 3000., 50., 50., 0.), // XXX don't hard-code? XXX 800?
-                                    set_value: watch! { model.dpi.unwrap_or(0.) },
-                                    connect_change_value(sender) => move |_, _, value| {
-                                        send!(sender, AppMsg::SetDpi(value));
-                                        gtk4::Inhibit(false)
+                                        set_label: watch! { &model.dpi.map_or_else(String::new, |dpi| format!("{}", model.round_dpi(dpi))) },
+                                    },
+                                    append: dpi_scale = &gtk4::Scale {
+                                        set_hexpand: true,
+                                        set_adjustment: &gtk4::Adjustment::new(800., 800., 3000., 50., 50., 0.), // XXX don't hard-code? XXX 800?
+                                        set_value: watch! { model.dpi.unwrap_or(0.) },
+                                        connect_change_value(sender) => move |_, _, value| {
+                                            send!(sender, AppMsg::SetDpi(value));
+                                            gtk4::Inhibit(false)
+                                        }
                                     }
                                 }
                             }
@@ -388,6 +421,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 
     fn post_view() {
+        self.stack.set_visible_child(if model.has_device {
+            &self.device_page
+        } else {
+            &self.no_device_page
+        });
+
         if model.bindings_changed {
             for (id, button) in &self.buttons {
                 if let Some(id) = model.swap_buttons(*id) {
