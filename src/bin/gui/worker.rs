@@ -16,7 +16,9 @@ use std::{
 };
 
 use super::AppMsg;
-use hp_mouse_configurator::{enumerate, Button, DeviceInfo, HpMouse, HpMouseEvents, ReadRes};
+use hp_mouse_configurator::{
+    enumerate, Button, DeviceInfo, Event, HpMouse, HpMouseEvents, ReadRes,
+};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct DeviceId(usize);
@@ -29,6 +31,7 @@ pub enum WorkerMsg {
     SetDpi(DeviceId, u16),
     SetLeftHanded(DeviceId, bool),
     SetBinding(DeviceId, Button),
+    HasFirmware(DeviceId),
 }
 
 pub struct WorkerModel {
@@ -57,12 +60,6 @@ impl WorkerModel {
             }
         };
 
-        // XXX errors
-        let _ = mouse.query_firmware();
-        let _ = mouse.query_battery();
-        let _ = mouse.query_button();
-        let _ = mouse.query_dpi();
-
         let device_id = self.next_device_id.clone();
         send!(parent_sender, super::AppMsg::DeviceAdded(device_id.clone()));
 
@@ -73,6 +70,9 @@ impl WorkerModel {
                 reader_thread(device_id, running, events, sender, parent_sender)
             }),
         );
+
+        // XXX errors
+        let _ = mouse.query_firmware().unwrap();
 
         self.devices
             .insert(self.next_device_id.clone(), (device.devnode, mouse));
@@ -116,6 +116,13 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
                 }
                 Err(err) => eprintln!("Error enumerating devices: {}", err),
             },
+            WorkerMsg::HasFirmware(id) => {
+                // XXX errors
+                let mouse = &self.devices.get(&id).unwrap().1;
+                let _ = mouse.query_battery().unwrap();
+                let _ = mouse.query_button().unwrap();
+                let _ = mouse.query_dpi().unwrap();
+            }
             WorkerMsg::SetDpi(id, value) => {
                 if let Some((_, mouse)) = &self.devices.get(&id) {
                     // XXX error
@@ -160,6 +167,9 @@ fn reader_thread(
                 break;
             }
             Ok(ReadRes::Packet(event)) => {
+                if let Event::Firmware { .. } = &event {
+                    send!(sender, WorkerMsg::HasFirmware(device_id.clone()));
+                }
                 send!(parent_sender, AppMsg::Event(device_id.clone(), event))
             }
             Ok(ReadRes::Continue) => {}
