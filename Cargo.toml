@@ -3,6 +3,10 @@ name = "hp-mouse-configurator"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "hp-mouse-configurator"
+path = "src/bin/gui/main.rs"
+
 [dependencies]
 gtk4 = "0.4"
 libc = "0.2"

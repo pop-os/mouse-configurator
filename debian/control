@@ -1,0 +1,19 @@
+Source: hp-mouse-configurator
+Section: admin
+Priority: optional
+Maintainer: System76 <info@system76.com>
+Build-Depends:
+  debhelper-compat (= 11),
+  cargo,
+  libgtk-4-dev,
+  libudev-dev,
+  pkg-config,
+Standards-Version: 4.1.1
+Homepage: https://github.com/pop-os/hp-mouse-configurator
+
+Package: hp-mouse-configurator
+Architecture: amd64 arm64
+Depends:
+  ${misc:Depends},
+  ${shlibs:Depends}
+Description: HP mouse configurator
