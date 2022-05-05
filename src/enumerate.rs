@@ -39,30 +39,45 @@ fn get_interface_number(device: &udev::Device) -> Option<u8> {
         .ok()
 }
 
+fn match_device(device: &udev::Device) -> Option<DeviceInfo> {
+    let hid_device = device.parent_with_subsystem("hid").ok()??;
+    let (vendor_id, product_id) = hid_device
+        .property_value("HID_ID")
+        .and_then(|x| parse_hid_id(x.to_str()?))?;
+    let interface = get_interface_number(&device);
+    let devnode = device.devnode()?;
+    match (vendor_id, product_id, interface) {
+        (HP_VENDOR_ID, USB_PRODUCT_ID, Some(1)) | (HP_VENDOR_ID, BT_PRODUCT_ID, _) => {
+            Some(DeviceInfo {
+                vendor_id,
+                product_id,
+                interface,
+                devnode: devnode.to_owned(),
+            })
+        }
+        _ => None,
+    }
+}
+
 pub fn enumerate() -> io::Result<Vec<DeviceInfo>> {
     let mut enumerator = udev::Enumerator::new()?;
     enumerator.match_subsystem("hidraw")?;
     Ok(enumerator
         .scan_devices()?
         .into_iter()
-        .filter_map(|device| {
-            let hid_device = device.parent_with_subsystem("hid").ok()??;
-            let (vendor_id, product_id) = hid_device
-                .property_value("HID_ID")
-                .and_then(|x| parse_hid_id(x.to_str()?))?;
-            let interface = get_interface_number(&device);
-            let devnode = device.devnode()?;
-            match (vendor_id, product_id, interface) {
-                (HP_VENDOR_ID, USB_PRODUCT_ID, Some(1)) | (HP_VENDOR_ID, BT_PRODUCT_ID, _) => {
-                    Some(DeviceInfo {
-                        vendor_id,
-                        product_id,
-                        interface,
-                        devnode: devnode.to_owned(),
-                    })
-                }
-                _ => None,
-            }
-        })
+        .filter_map(|device| match_device(&device))
         .collect())
+}
+
+pub fn monitor() -> io::Result<impl Iterator<Item = DeviceInfo>> {
+    Ok(udev::MonitorBuilder::new()?
+        .match_subsystem("hidraw")?
+        .listen()?
+        .filter_map(|evt| {
+            if evt.event_type() == udev::EventType::Add {
+                match_device(&evt.device())
+            } else {
+                None
+            }
+        }))
 }

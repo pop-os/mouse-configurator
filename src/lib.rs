@@ -1,9 +1,14 @@
-use std::{io, path::Path, sync::Arc};
+use std::{
+    io,
+    os::unix::io::{AsRawFd, RawFd},
+    path::Path,
+    sync::Arc,
+};
 
 pub mod button;
 pub use button::{Button, Op, Value};
 mod enumerate;
-pub use enumerate::{enumerate, DeviceInfo};
+pub use enumerate::{enumerate, monitor, DeviceInfo};
 mod event;
 pub use event::{Event, HpMouseEvents, ReadRes};
 mod hid;
@@ -128,5 +133,11 @@ impl HpMouse {
     // Using multiple readers will result in inconsistent behavior
     pub fn read(&self) -> HpMouseEvents {
         HpMouseEvents::new(self.dev.clone())
+    }
+}
+
+impl AsRawFd for HpMouse {
+    fn as_raw_fd(&self) -> RawFd {
+        self.dev.as_raw_fd()
     }
 }
