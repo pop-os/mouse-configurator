@@ -1,5 +1,8 @@
 use gtk4::{gdk, gdk_pixbuf, gio, glib, pango, prelude::*};
-use relm4::{send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets};
+use relm4::{
+    actions::{RelmAction, RelmActionGroup},
+    send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets,
+};
 use std::{collections::HashMap, process::Command};
 
 use hp_mouse_configurator::{Button, Event};
@@ -78,6 +81,7 @@ enum AppMsg {
     SetBinding(Button),
     SelectButton(Option<HardwareButton>),
     SetLeftHanded(bool),
+    Reset,
 }
 
 impl Model for AppModel {
@@ -215,6 +219,11 @@ impl AppUpdate for AppModel {
                     );
                 }
             }
+            AppMsg::Reset => {
+                if let Some(device_id) = self.device_id.clone() {
+                    send!(components.worker, WorkerMsg::Reset(device_id));
+                }
+            }
         }
         true
     }
@@ -226,6 +235,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
         main_window = gtk4::ApplicationWindow {
             set_title: Some("HP Mouse"),
             set_default_size: args!(1280, 768),
+            set_titlebar = Some(&gtk4::HeaderBar) {
+                pack_end = &gtk4::MenuButton {
+                    set_menu_model: Some(&menu),
+                    set_icon_name: "open-menu-symbolic"
+                }
+            },
             set_child = Some(&gtk4::ScrolledWindow) {
                 set_hscrollbar_policy: gtk4::PolicyType::Never,
                 set_child: stack = Some(&gtk4::Stack) {
@@ -376,11 +391,13 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 
     menu! {
+        menu: {
+            "Reset to Default" => ResetAction,
+        },
         config_menu: {
             "Rename Configuration" => RenameConfig,
             "Import Configuration" => ImportConfig,
             "Export Configuration" => ExportConfig,
-            "Reset to Default" => ResetConfig,
         }
     }
 
@@ -405,6 +422,17 @@ impl Widgets<AppModel, ()> for AppWidgets {
             buttons_widget.add_button(&button, *x, *y, *right);
             buttons.push((*id, button));
         }
+
+        let group = RelmActionGroup::<DeviceActionGroup>::new();
+
+        let reset_action: RelmAction<ResetAction> =
+            RelmAction::new_stateless(glib::clone!(@strong sender => move |_| {
+                send!(sender, AppMsg::Reset);
+            }));
+        group.add_action(reset_action);
+
+        let actions = group.into_action_group();
+        main_window.insert_action_group("device", Some(&actions));
 
         send!(sender, AppMsg::Refresh);
         glib::timeout_add_seconds_local(
@@ -439,11 +467,13 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 }
 
+relm4::new_action_group!(DeviceActionGroup, "device");
+relm4::new_stateless_action!(ResetAction, DeviceActionGroup, "reset_config");
+
 relm4::new_action_group!(ConfigActionGroup, "config");
 relm4::new_stateless_action!(RenameConfig, ConfigActionGroup, "rename_config");
 relm4::new_stateless_action!(ImportConfig, ConfigActionGroup, "import_config");
 relm4::new_stateless_action!(ExportConfig, ConfigActionGroup, "export_config");
-relm4::new_stateless_action!(ResetConfig, ConfigActionGroup, "reset_config");
 
 fn main() {
     gio::resources_register_include!("compiled.gresource").unwrap();

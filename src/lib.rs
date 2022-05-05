@@ -115,6 +115,16 @@ impl HpMouse {
         self.write_report_1(13, &data)
     }
 
+    pub fn reset(&self) -> io::Result<()> {
+        // TODO: Other devices may have different number of buttons?
+        for id in 0..7 {
+            let button = Button::new(id, 1, 0, &[]);
+            self.set_button(button, false)?;
+        }
+        self.set_left_handed(false)?;
+        Ok(())
+    }
+
     // Using multiple readers will result in inconsistent behavior
     pub fn read(&self) -> HpMouseEvents {
         HpMouseEvents::new(self.dev.clone())
