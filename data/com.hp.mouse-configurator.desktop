@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=HP Mouse Configurator
+Exec=hp-mouse-configurator
+Icon=input-mouse-symbolic
+Type=Application
+StartupNotify=true
+Categories=Utility;

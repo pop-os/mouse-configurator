@@ -11,7 +11,9 @@ SRC = Cargo.toml Cargo.lock Makefile $(shell find src -type f -wholename '*src/*
 
 .PHONY: all clean distclean install uninstall update
 
+APPID = "com.hp.mouse-configurator"
 BIN=hp-mouse-configurator
+DESKTOP = $(APPID).desktop
 
 TARGET = debug
 DEBUG ?= 0
@@ -35,9 +37,11 @@ distclean:
 
 install: all
 	install -D -m 0755 "target/release/$(BIN)" "$(DESTDIR)$(bindir)/$(BIN)"
+	install -Dm0644 "data/$(DESKTOP)" "$(DESTDIR)$(datadir)/applications/$(DESKTOP)"
 
 uninstall:
 	rm -f "$(DESTDIR)$(bindir)/$(BIN)"
+	rm -f "$(DESTDIR)$(datadir)/applications/$(DESKTOP)"
 
 update:
 	cargo update
