@@ -6,7 +6,7 @@ license = "MIT"
 
 [[bin]]
 name = "hp-mouse-configurator"
-path = "src/bin/gui/main.rs"
+path = "src/gui/main.rs"
 
 [dependencies]
 gtk4 = "0.4"
