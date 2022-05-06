@@ -11,6 +11,7 @@ use nix::{
     },
 };
 use std::{
+    env,
     ffi::OsStr,
     io::{self, IoSlice, IoSliceMut},
     os::unix::{
@@ -42,10 +43,18 @@ impl DeviceMonitorProcess {
             None,
             SockFlag::SOCK_CLOEXEC,
         )?;
+        let command_path = if cfg!(feature = "appimage") {
+            PathBuf::from(env::var("APPIMAGE").expect("Failed to get executable path"))
+        } else {
+            env::current_exe().expect("Failed to get executable path")
+        };
+
         // XXX appimage? Own executable?
+        //
         let stdin = unsafe { Stdio::from_raw_fd(sock1) };
         let mut child = Command::new("pkexec")
-            .args(&["hp-mouse-configurator", "--device-monitor"])
+            .arg(command_path)
+            .arg("--device-monitor")
             .stdin(stdin)
             .spawn()?;
 

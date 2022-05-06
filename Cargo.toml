@@ -23,3 +23,6 @@ features = ["std"]
 
 [build-dependencies]
 gio = "0.15.10"
+
+[features]
+appimage = []
