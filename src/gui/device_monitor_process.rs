@@ -55,8 +55,8 @@ impl DeviceMonitorProcess {
                     }
                     Errno::EPIPE => {
                         let status = child.wait()?;
-                        return Err(io::Error::new(io::ErrorKind::Other, "Process failed"));
-                        // XXX return errro
+                        let message = format!("Pkexec process failed: {}", status);
+                        return Err(io::Error::new(io::ErrorKind::Other, message));
                     }
                     _ => {}
                 }
@@ -112,7 +112,6 @@ pub fn device_monitor_process() {
                 let fds = &[device.as_raw_fd()];
                 let iov = &[IoSlice::new(path)];
                 let cmsgs = &[ControlMessage::ScmRights(fds)];
-                // XXX test for EINTR? EPIPE?
                 loop {
                     let res = sendmsg(
                         libc::STDIN_FILENO,
@@ -126,6 +125,9 @@ pub fn device_monitor_process() {
                             break;
                         }
                         Err(Errno::EINTR) => {}
+                        Err(Errno::EPIPE) => {
+                            return;
+                        }
                         Err(err) => {
                             eprintln!("Error writing to socket: {}", err);
                             break;

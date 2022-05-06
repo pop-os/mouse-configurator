@@ -12,6 +12,7 @@ use bindings::{Entry, HardwareButton};
 mod buttons_widget;
 use buttons_widget::{ButtonsWidget, BUTTONS, IMAGE_WIDTH};
 mod device_monitor_process;
+use device_monitor_process::DeviceMonitorProcess;
 mod dialog;
 use dialog::{DialogModel, DialogMsg};
 mod swap_button_dialog;
@@ -35,11 +36,11 @@ struct Device {
     left_handed: bool,
 }
 
-#[derive(Default)]
 struct AppModel {
     devices: HashMap<DeviceId, Device>,
     device_id: Option<DeviceId>,
     bindings_changed: bool,
+    device_monitor: Option<DeviceMonitorProcess>,
 }
 
 impl AppModel {
@@ -72,7 +73,7 @@ impl AppModel {
 }
 
 enum AppMsg {
-    Refresh,
+    SetDeviceMonitor,
     DeviceAdded(DeviceId),
     DeviceRemoved(DeviceId),
     #[allow(unused)]
@@ -104,8 +105,13 @@ impl AppUpdate for AppModel {
 
         match msg {
             AppMsg::RenameConfig => {}
-            AppMsg::Refresh => {
-                send!(components.worker, WorkerMsg::DetectDevices);
+            AppMsg::SetDeviceMonitor => {
+                if let Some(device_monitor) = self.device_monitor.take() {
+                    send!(
+                        components.worker,
+                        WorkerMsg::SetDeviceMonitor(device_monitor)
+                    );
+                }
             }
             AppMsg::DeviceAdded(id) => {
                 self.devices.insert(id.clone(), Device::default());
@@ -435,13 +441,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
         let actions = group.into_action_group();
         main_window.insert_action_group("device", Some(&actions));
 
-        send!(sender, AppMsg::Refresh);
-        glib::timeout_add_seconds_local(
-            1,
-            glib::clone!(@strong sender => move || {
-                glib::Continue(sender.send(AppMsg::Refresh).is_ok())
-            }),
-        );
+        send!(sender, AppMsg::SetDeviceMonitor);
     }
 
     fn post_view() {
@@ -483,6 +483,8 @@ fn main() {
         return;
     }
 
+    let device_monitor = device_monitor_process::DeviceMonitorProcess::new().unwrap();
+
     gio::resources_register_include!("compiled.gresource").unwrap();
 
     gtk4::init().unwrap();
@@ -502,7 +504,12 @@ fn main() {
         gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
 
-    let model = AppModel::default();
+    let model = AppModel {
+        devices: HashMap::new(),
+        device_id: None,
+        bindings_changed: false,
+        device_monitor: Some(device_monitor),
+    };
     let app = RelmApp::new(model);
     app.run();
 }

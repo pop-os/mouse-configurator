@@ -15,10 +15,8 @@ use std::{
     thread,
 };
 
-use super::AppMsg;
-use hp_mouse_configurator::{
-    enumerate, Button, DeviceInfo, Event, HpMouse, HpMouseEvents, ReadRes,
-};
+use super::{AppMsg, DeviceMonitorProcess};
+use hp_mouse_configurator::{Button, Event, HpMouse, HpMouseEvents, ReadRes};
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct DeviceId(usize);
@@ -26,8 +24,9 @@ pub struct DeviceId(usize);
 // XXX periodically poll for devices? what is done in keyboard configurator?
 
 pub enum WorkerMsg {
+    SetDeviceMonitor(DeviceMonitorProcess),
+    AddDevice(PathBuf, HpMouse),
     Disconnect(DeviceId),
-    DetectDevices,
     SetDpi(DeviceId, u16),
     SetLeftHanded(DeviceId, bool),
     SetBinding(DeviceId, Button),
@@ -49,18 +48,11 @@ impl Model for WorkerModel {
 impl WorkerModel {
     fn add_device(
         &mut self,
-        device: DeviceInfo,
+        path: PathBuf,
+        mouse: HpMouse,
         sender: &Sender<WorkerMsg>,
         parent_sender: &Sender<super::AppMsg>,
     ) {
-        let mouse = match device.open() {
-            Ok(mouse) => mouse,
-            Err(err) => {
-                eprintln!("Error opening device: {}", err);
-                return;
-            }
-        };
-
         let device_id = self.next_device_id.clone();
         send!(parent_sender, super::AppMsg::DeviceAdded(device_id.clone()));
 
@@ -76,7 +68,7 @@ impl WorkerModel {
         let _ = mouse.query_firmware().unwrap();
 
         self.devices
-            .insert(self.next_device_id.clone(), (device.devnode, mouse));
+            .insert(self.next_device_id.clone(), (path, mouse));
         self.next_device_id.0 += 1;
     }
 }
@@ -102,21 +94,14 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
                 send!(parent_sender, super::AppMsg::DeviceRemoved(id));
                 eprintln!("End reader");
             }
-            WorkerMsg::DetectDevices => match enumerate() {
-                Ok(devices) => {
-                    for device in devices {
-                        if !self
-                            .devices
-                            .values()
-                            .any(|(devnode, _)| devnode == &device.devnode)
-                        {
-                            eprintln!("Found device: {:?}", device);
-                            self.add_device(device, &sender, &parent_sender);
-                        }
-                    }
-                }
-                Err(err) => eprintln!("Error enumerating devices: {}", err),
-            },
+            WorkerMsg::SetDeviceMonitor(device_monitor) => {
+                thread::spawn(glib::clone!(@strong sender => move || {
+                    device_monitor_thread(device_monitor, sender);
+                }));
+            }
+            WorkerMsg::AddDevice(path, mouse) => {
+                self.add_device(path, mouse, &sender, &parent_sender);
+            }
             WorkerMsg::HasFirmware(id) => {
                 // XXX errors
                 let mouse = &self.devices.get(&id).unwrap().1;
@@ -148,6 +133,15 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
                     let _ = mouse.reset();
                 }
             }
+        }
+    }
+}
+
+fn device_monitor_thread(device_monitor: DeviceMonitorProcess, sender: Sender<WorkerMsg>) {
+    for i in device_monitor {
+        // XXX error handling?
+        if let Ok((path, mouse)) = i {
+            send!(sender, WorkerMsg::AddDevice(path, mouse));
         }
     }
 }
