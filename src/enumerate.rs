@@ -1,4 +1,5 @@
-use std::{io, path::PathBuf};
+use nix::poll::{poll, PollFd, PollFlags};
+use std::{io, os::unix::io::AsRawFd, path::PathBuf};
 
 use super::HpMouse;
 
@@ -69,15 +70,40 @@ pub fn enumerate() -> io::Result<Vec<DeviceInfo>> {
         .collect())
 }
 
-pub fn monitor() -> io::Result<impl Iterator<Item = DeviceInfo>> {
-    Ok(udev::MonitorBuilder::new()?
-        .match_subsystem("hidraw")?
-        .listen()?
-        .filter_map(|evt| {
-            if evt.event_type() == udev::EventType::Add {
-                match_device(&evt.device())
-            } else {
-                None
+struct PollMonitorIter {
+    monitor: udev::MonitorSocket,
+    poll: bool,
+}
+
+impl Iterator for PollMonitorIter {
+    type Item = DeviceInfo;
+
+    fn next(&mut self) -> Option<DeviceInfo> {
+        loop {
+            if self.poll {
+                let fd = PollFd::new(self.monitor.as_raw_fd(), PollFlags::POLLIN);
+                let _ = poll(&mut [fd], -1);
             }
-        }))
+            self.poll = false;
+            if let Some(evt) = self.monitor.next() {
+                if evt.event_type() == udev::EventType::Add {
+                    if let Some(device_info) = match_device(&evt.device()) {
+                        return Some(device_info);
+                    }
+                }
+            } else {
+            }
+            self.poll = true;
+        }
+    }
+}
+
+pub fn monitor() -> io::Result<impl Iterator<Item = DeviceInfo> + 'static> {
+    let monitor = udev::MonitorBuilder::new()?
+        .match_subsystem("hidraw")?
+        .listen()?;
+    Ok(PollMonitorIter {
+        monitor,
+        poll: true,
+    })
 }
