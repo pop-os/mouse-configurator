@@ -1,3 +1,7 @@
+//! Use a separate process, started with `pkexec`, to monitor for devices
+//! with udev and open them. Using `pkexec` allows it to access the device
+//! without a persistent daemon or udev rule.
+
 use nix::{
     cmsg_space,
     errno::Errno,
