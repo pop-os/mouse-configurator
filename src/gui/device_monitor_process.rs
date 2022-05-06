@@ -39,7 +39,7 @@ impl DeviceMonitorProcess {
     pub fn new() -> io::Result<Self> {
         let (sock1, sock2) = socketpair(
             AddressFamily::Unix,
-            SockType::Datagram,
+            SockType::SeqPacket,
             None,
             SockFlag::SOCK_CLOEXEC,
         )?;
@@ -61,20 +61,20 @@ impl DeviceMonitorProcess {
         let mut buf = [0; 1024];
 
         loop {
-            if let Err(err) = nix::unistd::read(sock2, &mut buf) {
-                match err {
-                    Errno::EINTR => {
-                        continue;
-                    }
-                    Errno::EPIPE => {
-                        let status = child.wait()?;
-                        let message = format!("Pkexec process failed: {}", status);
-                        return Err(io::Error::new(io::ErrorKind::Other, message));
-                    }
-                    _ => {}
+            match nix::unistd::read(sock2, &mut buf) {
+                Err(Errno::EINTR) => {}
+                Ok(0) | Err(Errno::EPIPE) => {
+                    let status = child.wait()?;
+                    let message = format!("Pkexec process failed: {}", status);
+                    return Err(io::Error::new(io::ErrorKind::Other, message));
+                }
+                Err(err) => {
+                    return Err(err.into());
+                }
+                Ok(x) => {
+                    break;
                 }
             }
-            break;
         }
 
         Ok(Self { sock: sock2, buf })
