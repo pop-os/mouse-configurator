@@ -3,7 +3,7 @@ use relm4::{
     actions::{RelmAction, RelmActionGroup},
     send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets,
 };
-use std::{collections::HashMap, process::Command};
+use std::{collections::HashMap, env, process::Command};
 
 use hp_mouse_configurator::{Button, Event};
 
@@ -11,6 +11,7 @@ mod bindings;
 use bindings::{Entry, HardwareButton};
 mod buttons_widget;
 use buttons_widget::{ButtonsWidget, BUTTONS, IMAGE_WIDTH};
+mod device_monitor_process;
 mod dialog;
 use dialog::{DialogModel, DialogMsg};
 mod swap_button_dialog;
@@ -476,6 +477,12 @@ relm4::new_stateless_action!(ImportConfig, ConfigActionGroup, "import_config");
 relm4::new_stateless_action!(ExportConfig, ConfigActionGroup, "export_config");
 
 fn main() {
+    let mut args = env::args().skip(1);
+    if args.next().as_deref() == Some("--device-monitor") {
+        device_monitor_process::device_monitor_process();
+        return;
+    }
+
     gio::resources_register_include!("compiled.gresource").unwrap();
 
     gtk4::init().unwrap();

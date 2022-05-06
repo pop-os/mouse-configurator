@@ -1,6 +1,6 @@
 use std::{
     io,
-    os::unix::io::{AsRawFd, RawFd},
+    os::unix::io::{AsRawFd, FromRawFd, RawFd},
     path::Path,
     sync::Arc,
 };
@@ -139,5 +139,13 @@ impl HpMouse {
 impl AsRawFd for HpMouse {
     fn as_raw_fd(&self) -> RawFd {
         self.dev.as_raw_fd()
+    }
+}
+
+impl FromRawFd for HpMouse {
+    unsafe fn from_raw_fd(fd: RawFd) -> Self {
+        HpMouse {
+            dev: Arc::new(Hid::from_raw_fd(fd)),
+        }
     }
 }

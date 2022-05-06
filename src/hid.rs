@@ -1,7 +1,7 @@
 use std::{
     fs::File,
     io,
-    os::unix::io::{AsRawFd, IntoRawFd, RawFd},
+    os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd},
     path::Path,
 };
 
@@ -17,6 +17,12 @@ impl Drop for Hid {
 impl AsRawFd for Hid {
     fn as_raw_fd(&self) -> RawFd {
         self.0
+    }
+}
+
+impl FromRawFd for Hid {
+    unsafe fn from_raw_fd(fd: RawFd) -> Self {
+        Self(fd)
     }
 }
 
