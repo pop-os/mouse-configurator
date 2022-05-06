@@ -49,8 +49,6 @@ impl DeviceMonitorProcess {
             env::current_exe().expect("Failed to get executable path")
         };
 
-        // XXX appimage? Own executable?
-        //
         let stdin = unsafe { Stdio::from_raw_fd(sock1) };
         let mut child = Command::new("pkexec")
             .arg(command_path)
