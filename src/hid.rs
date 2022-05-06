@@ -6,6 +6,7 @@ use std::{
 };
 
 // TODO: Use `OwnedFd` when stable
+#[derive(Debug)]
 pub struct Hid(RawFd);
 
 impl Drop for Hid {

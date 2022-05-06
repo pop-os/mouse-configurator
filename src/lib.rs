@@ -16,6 +16,7 @@ use hid::Hid;
 
 const HP_SIGNATURE: u16 = 0xCF3;
 
+#[derive(Debug)]
 pub struct HpMouse {
     dev: Arc<Hid>,
 }
