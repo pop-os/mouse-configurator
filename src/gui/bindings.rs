@@ -1,3 +1,6 @@
+// TODO custom bindings
+// - Need way to get label, binding, from json representation
+
 #![allow(overflowing_literals)]
 
 use once_cell::sync::Lazy;
@@ -5,8 +8,9 @@ use std::collections::HashMap;
 
 use hp_mouse_configurator::{Op, Value::*};
 
+// TODO better naming? Important if serialized in json.
 #[repr(u8)]
-#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
 pub enum HardwareButton {
     Right = 0,
     Middle = 1,
@@ -52,45 +56,89 @@ pub struct Category {
 
 #[derive(Debug)]
 pub struct Entry {
+    pub id: PresetBinding,
     pub label: &'static str,
     pub binding: Vec<Op>,
 }
 
+#[derive(Clone, Copy, Eq, Hash, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum PresetBinding {
+    RightClick,
+    LeftClick,
+    MiddleClick,
+    ScrollLeft,
+    ScrollRight,
+    Back,
+    Forward,
+    SwitchApp,
+    VolumeDown,
+    VolumeUp,
+    NextTrack,
+    PreviousTrack,
+    PlayPause,
+    Mute,
+}
+
+impl PresetBinding {
+    pub fn entry(self) -> &'static Entry {
+        static ENTRY_FOR_PRESET: Lazy<HashMap<PresetBinding, &Entry>> = Lazy::new(|| {
+            let mut map = HashMap::new();
+            for category in &*BINDINGS {
+                for entry in &category.entries {
+                    map.insert(entry.id, entry);
+                }
+            }
+            map
+        });
+        ENTRY_FOR_PRESET.get(&self).unwrap().clone()
+    }
+}
+
 pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
+    use PresetBinding::*;
     vec![
         Category {
             label: "Mouse Controls",
             entries: vec![
                 Entry {
+                    id: RightClick,
                     label: "Right Click",
                     binding: vec![Op::mouse(true, 2, 0, 0, 0, 0)],
                 },
                 Entry {
+                    id: LeftClick,
                     label: "Left Click",
                     binding: vec![Op::mouse(true, 1, 0, 0, 0, 0)],
                 },
                 Entry {
+                    id: MiddleClick,
                     label: "Middle Click",
                     binding: vec![Op::mouse(true, 4, 0, 0, 0, 0)],
                 },
                 Entry {
+                    id: ScrollLeft,
                     label: "Scroll Left",
                     binding: vec![Op::mouse(false, 0, 0, 0, 0, -1)],
                 },
                 Entry {
+                    id: ScrollRight,
                     label: "Scroll Right",
                     binding: vec![Op::mouse(false, 0, 0, 0, 0, 1)],
                 },
                 Entry {
+                    id: Back,
                     label: "Back",
                     binding: vec![Op::mouse(true, 8, 0, 0, 0, 0)],
                 },
                 Entry {
+                    id: Forward,
                     label: "Forward",
                     binding: vec![Op::mouse(true, 16, 0, 0, 0, 0)],
                 },
                 Entry {
                     // XXX
+                    id: SwitchApp,
                     label: "Switch App",
                     binding: vec![Op::key(true, vec![Const(0), Const(0x2B)])], // super + tab
                 },
@@ -100,26 +148,32 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
             label: "Media Controls",
             entries: vec![
                 Entry {
+                    id: VolumeDown,
                     label: "Volume Down",
                     binding: vec![Op::media(true, vec![Const(0xEA)])],
                 },
                 Entry {
+                    id: VolumeUp,
                     label: "Volume Up",
                     binding: vec![Op::media(true, vec![Const(0xE9)])],
                 },
                 Entry {
+                    id: NextTrack,
                     label: "Next Track",
                     binding: vec![Op::media(true, vec![Const(0xB5)])],
                 },
                 Entry {
+                    id: PreviousTrack,
                     label: "Previous Track",
                     binding: vec![Op::media(true, vec![Const(0xB6)])],
                 },
                 Entry {
+                    id: PlayPause,
                     label: "Play / Pause",
                     binding: vec![Op::media(true, vec![Const(0xCD)])],
                 },
                 Entry {
+                    id: Mute,
                     label: "Mute",
                     binding: vec![Op::media(true, vec![Const(0xE2)])],
                 },
