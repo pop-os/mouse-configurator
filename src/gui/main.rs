@@ -16,6 +16,7 @@ use device_monitor_process::DeviceMonitorProcess;
 mod dialog;
 use dialog::{DialogModel, DialogMsg};
 mod profile;
+use profile::{Binding, Profile};
 mod swap_button_dialog;
 use swap_button_dialog::{SwapButtonDialogModel, SwapButtonDialogMsg};
 mod worker;
@@ -33,8 +34,7 @@ struct Device {
     battery_percent: u8,
     dpi: Option<f64>,
     dpi_step: f64,
-    bindings: HashMap<HardwareButton, &'static Entry>,
-    left_handed: bool,
+    profile: Profile,
 }
 
 struct AppModel {
@@ -60,9 +60,9 @@ impl AppModel {
     // Swap left and right buttons, if in left handed mode
     fn swap_buttons(&self, button: Option<HardwareButton>) -> Option<HardwareButton> {
         if let Some(device) = self.device() {
-            if device.left_handed && button.is_none() {
+            if device.profile.left_handed && button.is_none() {
                 Some(HardwareButton::Right)
-            } else if device.left_handed && button == Some(HardwareButton::Right) {
+            } else if device.profile.left_handed && button == Some(HardwareButton::Right) {
                 None
             } else {
                 button
@@ -70,6 +70,11 @@ impl AppModel {
         } else {
             button
         }
+    }
+
+    fn round_dpi(&self, dpi: f64) -> u16 {
+        let dpi_step = self.device().map_or(1., |x| x.dpi_step);
+        ((dpi / dpi_step).round() * dpi_step) as u16
     }
 }
 
@@ -91,13 +96,6 @@ impl Model for AppModel {
     type Msg = AppMsg;
     type Widgets = AppWidgets;
     type Components = AppComponents;
-}
-
-impl AppModel {
-    fn round_dpi(&self, dpi: f64) -> u16 {
-        let dpi_step = self.device().map_or(1., |x| x.dpi_step);
-        ((dpi / dpi_step).round() * dpi_step) as u16
-    }
 }
 
 impl AppUpdate for AppModel {
@@ -142,19 +140,19 @@ impl AppUpdate for AppModel {
                         device.dpi = Some(dpi.into());
                         device.dpi_step = step_dpi.into();
                     }
-                    device.left_handed = left_handed;
+                    device.profile.left_handed = left_handed;
 
                     if self.device_id == Some(device_id) {
                         self.bindings_changed = true;
                     }
                 }
                 Event::Buttons { buttons, .. } => {
-                    let bindings = &mut self.devices.get_mut(&device_id).unwrap().bindings;
+                    let bindings = &mut self.devices.get_mut(&device_id).unwrap().profile.bindings;
                     // Reset `self.bindings` to defaults
                     bindings.clear();
                     for (_, _, _, id) in BUTTONS {
                         if let Some(id) = id {
-                            bindings.insert(*id, id.def_binding());
+                            bindings.insert(*id, Binding::Preset(id.def_binding().id));
                         }
                     }
 
@@ -169,7 +167,7 @@ impl AppUpdate for AppModel {
                         match button.decode_action() {
                             Ok(action) => {
                                 if let Some(entry) = Entry::for_binding(&action) {
-                                    bindings.insert(id, entry);
+                                    bindings.insert(id, Binding::Preset(entry.id));
                                 } else {
                                     bindings.remove(&id);
                                     eprintln!("Unrecognized action: {:?}", action);
@@ -206,7 +204,7 @@ impl AppUpdate for AppModel {
                 if let Some(id) = button {
                     send!(components.dialog, DialogMsg::Show(id as u8))
                 } else {
-                    let left_handed = self.device().map_or(false, |x| x.left_handed);
+                    let left_handed = self.device().map_or(false, |x| x.profile.left_handed);
                     send!(
                         components.swap_button_dialog,
                         SwapButtonDialogMsg::Show(left_handed)
@@ -453,13 +451,13 @@ impl Widgets<AppModel, ()> for AppWidgets {
         });
 
         if model.bindings_changed {
-            let bindings = model.device().map(|x| &x.bindings);
+            let bindings = model.device().map(|x| &x.profile.bindings);
             for (id, button) in &self.buttons {
                 if let Some(id) = model.swap_buttons(*id) {
                     button.set_label(
-                        bindings
+                        &bindings
                             .and_then(|x| x.get(&id))
-                            .map_or("Unknown", |x| x.label),
+                            .map_or_else(|| "Unknown".to_string(), |x| x.label()),
                     );
                 } else {
                     button.set_label("Left Click");
