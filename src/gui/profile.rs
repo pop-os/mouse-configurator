@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, env, path::PathBuf};
 
 use super::bindings::{HardwareButton, PresetBinding};
 
@@ -33,4 +33,25 @@ struct MouseInfo {
 struct Mouse {
     profiles: Vec<Profile>,
     info: MouseInfo,
+}
+
+fn data_dir() -> PathBuf {
+    if let Ok(dir) = env::var("XDG_DATA_HOME") {
+        dir.into()
+    } else if let Ok(dir) = env::var("HOME") {
+        let mut path = PathBuf::from(dir);
+        path.push(".local/share");
+        path
+    } else {
+        panic!("`XDG_DATA_HOME` and `HOME` undefined")
+    }
+}
+
+fn app_data_dir() -> PathBuf {
+    let mut dir = data_dir();
+    dir.push("hp-mouse-configurator");
+    if let Err(err) = std::fs::create_dir_all(&dir) {
+        panic!("Failed to create directory `{}`: {}", dir.display(), err);
+    }
+    dir
 }
