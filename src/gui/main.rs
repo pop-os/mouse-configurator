@@ -31,7 +31,7 @@ struct AppComponents {
 
 #[derive(Default)]
 struct Device {
-    battery_percent: u8,
+    battery_percent: Option<u8>,
     dpi_step: f64,
     mouse: MouseInfo,
     profile: Profile,
@@ -121,17 +121,14 @@ impl AppUpdate for AppModel {
                 // Do nothing until we get `Event::Firmware`
             }
             AppMsg::DeviceRemoved(id) => {
-                self.devices.remove(&id);
-                if self.device_id == Some(id) {
-                    self.device_id = None;
-                    self.bindings_changed = true;
+                if let Some(mut device) = self.devices.get_mut(&id) {
+                    device.battery_percent = None;
                 }
-                self.device_list_changed = true;
             }
             AppMsg::Event(device_id, event) => match event {
                 Event::Battery { level, .. } => {
                     let device = self.devices.get_mut(&device_id).unwrap();
-                    device.battery_percent = level;
+                    device.battery_percent = Some(level);
                 }
                 Event::Mouse {
                     dpi,
@@ -188,7 +185,19 @@ impl AppUpdate for AppModel {
                     }
                 }
                 Event::Firmware { serial, .. } => {
-                    if !self.devices.contains_key(&device_id) {
+                    let old_id = self
+                        .devices
+                        .iter()
+                        .filter(|(_k, v)| &v.mouse.serial == &serial)
+                        .next()
+                        .map(|(k, _v)| k.clone());
+                    if let Some(old_id) = old_id {
+                        let device = self.devices.remove(&old_id).unwrap();
+                        self.devices.insert(device_id.clone(), device);
+                        if self.device_id == Some(old_id) {
+                            self.device_id = Some(device_id);
+                        }
+                    } else if !self.devices.contains_key(&device_id) {
                         let device = Device {
                             mouse: MouseInfo { serial, dpi: None },
                             ..Default::default()
@@ -305,7 +314,9 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     },
                     add_child: device_list_page = &gtk4::ListBox {
                         add_css_class: "frame",
+                        set_header_func: header_func,
                         set_halign: gtk4::Align::Center,
+                        set_valign: gtk4::Align::Center,
                         set_margin_start: 12,
                         set_margin_end: 12,
                         set_margin_top: 12,
@@ -324,26 +335,27 @@ impl Widgets<AppModel, ()> for AppWidgets {
                         set_margin_end: 12,
                         set_margin_top: 12,
                         set_margin_bottom: 12,
+                        append = &gtk4::Button {
+                            set_halign: gtk4::Align::Center,
+                            set_label: "Device List",
+                            set_visible: watch! { model.devices.len() > 1 },
+                            connect_clicked(sender) => move |_| {
+                                send!(sender, AppMsg::SelectDevice(None));
+                            }
+                        },
                         append = &gtk4::Box {
-                            append = &gtk4::Button {
-                                set_halign: gtk4::Align::Center,
-                                set_label: "Device List",
-                                set_visible: watch! { model.devices.len() > 1 },
-                                connect_clicked(sender) => move |_| {
-                                    send!(sender, AppMsg::SelectDevice(None));
-                                }
-                            },
                             set_orientation: gtk4::Orientation::Horizontal,
                             set_halign: gtk4::Align::Center,
                             set_spacing: 12,
                             append = &gtk4::Box {
                                 set_orientation: gtk4::Orientation::Horizontal,
                                 set_spacing: 6,
+                                set_visible: watch! { model.device().and_then(|x| x.battery_percent).is_some() },
                                 append = &gtk4::Image {
                                     set_from_icon_name: Some("battery-symbolic"),
                                 },
                                 append = &gtk4::Label {
-                                    set_label: watch! { &format!("{}%", model.device().map_or(0, |x| x.battery_percent)) }
+                                    set_label: watch! { &format!("{}%", model.device().and_then(|x| x.battery_percent).unwrap_or(0)) }
                                 },
                             },
                             append = &gtk4::Box {
@@ -630,4 +642,12 @@ fn main() {
     };
     let app = RelmApp::new(model);
     app.run();
+}
+
+fn header_func(row: &gtk4::ListBoxRow, before: Option<&gtk4::ListBoxRow>) {
+    if before.is_none() {
+        row.set_header(None::<&gtk4::Widget>)
+    } else if row.header().is_none() {
+        row.set_header(Some(&gtk4::Separator::new(gtk4::Orientation::Horizontal)));
+    }
 }
