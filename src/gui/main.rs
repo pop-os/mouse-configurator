@@ -31,6 +31,7 @@ struct AppComponents {
 
 #[derive(Default)]
 struct Device {
+    serial: String,
     battery_percent: u8,
     dpi: Option<f64>,
     dpi_step: f64,
@@ -117,13 +118,8 @@ impl AppUpdate for AppModel {
                     );
                 }
             }
-            AppMsg::DeviceAdded(id) => {
-                self.devices.insert(id.clone(), Device::default());
-                if self.devices.len() == 1 {
-                    self.device_id = Some(id);
-                    self.bindings_changed = true;
-                }
-                self.device_list_changed = true;
+            AppMsg::DeviceAdded(_id) => {
+                // Do nothing until we get `Event::Firmware`
             }
             AppMsg::DeviceRemoved(id) => {
                 self.devices.remove(&id);
@@ -192,7 +188,20 @@ impl AppUpdate for AppModel {
                         self.bindings_changed = true;
                     }
                 }
-                Event::Firmware { .. } => {}
+                Event::Firmware { serial, .. } => {
+                    if !self.devices.contains_key(&device_id) {
+                        let device = Device {
+                            serial,
+                            ..Default::default()
+                        };
+                        self.devices.insert(device_id.clone(), device);
+                        if self.devices.len() == 1 {
+                            self.device_id = Some(device_id);
+                            self.bindings_changed = true;
+                        }
+                        self.device_list_changed = true;
+                    }
+                }
                 _ => {}
             },
             AppMsg::SetDpi(value) => {
@@ -542,7 +551,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                 set_label: "HP 930 series Creator Wireless Mouse" // TODO don't hard-code
                             },
                             append = &gtk4::Label {
-                                set_label: "Serial: XXX" // TODO
+                                set_label: &format!("Serial: {}", device.serial )
                             }
                         }
                     }
