@@ -42,6 +42,7 @@ struct AppModel {
     device_id: Option<DeviceId>,
     bindings_changed: bool,
     device_monitor: Option<DeviceMonitorProcess>,
+    show_about: bool,
 }
 
 impl AppModel {
@@ -90,6 +91,7 @@ enum AppMsg {
     SelectButton(Option<HardwareButton>),
     SetLeftHanded(bool),
     Reset,
+    ShowAbout(bool),
 }
 
 impl Model for AppModel {
@@ -229,6 +231,9 @@ impl AppUpdate for AppModel {
                 if let Some(device_id) = self.device_id.clone() {
                     send!(components.worker, WorkerMsg::Reset(device_id));
                 }
+            }
+            AppMsg::ShowAbout(visible) => {
+                self.show_about = visible;
             }
         }
         true
@@ -399,6 +404,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
     menu! {
         menu: {
             "Reset to Default" => ResetAction,
+            "About" => AboutAction,
         },
         config_menu: {
             "Rename Configuration" => RenameConfig,
@@ -409,9 +415,23 @@ impl Widgets<AppModel, ()> for AppWidgets {
 
     additional_fields! {
         buttons: Vec<(Option<HardwareButton>, gtk4::Button)>,
+        about_dialog: gtk4::AboutDialog,
     }
 
     fn post_init() {
+        let about_dialog = gtk4::AboutDialog::builder()
+            .transient_for(&main_window)
+            .hide_on_close(true)
+            .version(env!("CARGO_PKG_VERSION"))
+            .logo_icon_name("input-mouse-symbolic") // TODO
+            .copyright("Copyright 2022 Hewlett-Packard Development Company, L.P.")
+            .license_type(gtk4::License::MitX11)
+            .build();
+        about_dialog.connect_close_request(glib::clone!(@strong sender => move |_| {
+            send!(sender, AppMsg::ShowAbout(false));
+            gtk4::Inhibit(true)
+        }));
+
         let mut buttons = Vec::new();
 
         for (x, y, right, id) in BUTTONS {
@@ -429,21 +449,32 @@ impl Widgets<AppModel, ()> for AppWidgets {
             buttons.push((*id, button));
         }
 
-        let group = RelmActionGroup::<DeviceActionGroup>::new();
+        let app_group = RelmActionGroup::<AppActionGroup>::new();
+        let device_group = RelmActionGroup::<DeviceActionGroup>::new();
+
+        let about_action: RelmAction<AboutAction> =
+            RelmAction::new_stateless(glib::clone!(@strong sender => move |_| {
+                send!(sender, AppMsg::ShowAbout(true));
+            }));
+        app_group.add_action(about_action);
 
         let reset_action: RelmAction<ResetAction> =
             RelmAction::new_stateless(glib::clone!(@strong sender => move |_| {
                 send!(sender, AppMsg::Reset);
             }));
-        group.add_action(reset_action);
+        device_group.add_action(reset_action);
 
-        let actions = group.into_action_group();
-        main_window.insert_action_group("device", Some(&actions));
+        let app_actions = app_group.into_action_group();
+        let device_actions = device_group.into_action_group();
+        main_window.insert_action_group("app", Some(&app_actions));
+        main_window.insert_action_group("device", Some(&device_actions));
 
         send!(sender, AppMsg::SetDeviceMonitor);
     }
 
     fn post_view() {
+        self.about_dialog.set_visible(model.show_about);
+
         self.stack.set_visible_child(if model.device_id.is_some() {
             &self.device_page
         } else {
@@ -467,6 +498,9 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 }
 
+relm4::new_action_group!(AppActionGroup, "app");
+relm4::new_stateless_action!(AboutAction, AppActionGroup, "about");
+
 relm4::new_action_group!(DeviceActionGroup, "device");
 relm4::new_stateless_action!(ResetAction, DeviceActionGroup, "reset_config");
 
@@ -488,6 +522,10 @@ fn main() {
 
     gtk4::init().unwrap();
 
+    // TODO
+    glib::set_prgname(Some("com.system76.mouseconfigurator"));
+    glib::set_application_name("Mouse Configurator");
+
     let provider = gtk4::CssProvider::new();
     provider.load_from_data(
         b"
@@ -508,6 +546,7 @@ fn main() {
         device_id: None,
         bindings_changed: false,
         device_monitor: Some(device_monitor),
+        show_about: false,
     };
     let app = RelmApp::new(model);
     app.run();
