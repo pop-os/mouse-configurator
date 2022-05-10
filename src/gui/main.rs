@@ -3,7 +3,7 @@ use relm4::{
     actions::{RelmAction, RelmActionGroup},
     send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets,
 };
-use std::{collections::HashMap, env, process::Command};
+use std::{cell::RefCell, collections::HashMap, env, process::Command, rc::Rc};
 
 use hp_mouse_configurator::{Button, Event};
 
@@ -41,6 +41,7 @@ struct AppModel {
     devices: HashMap<DeviceId, Device>,
     device_id: Option<DeviceId>,
     bindings_changed: bool,
+    device_list_changed: bool,
     device_monitor: Option<DeviceMonitorProcess>,
     show_about: bool,
 }
@@ -92,6 +93,7 @@ enum AppMsg {
     SetLeftHanded(bool),
     Reset,
     ShowAbout(bool),
+    SelectDevice(Option<DeviceId>),
 }
 
 impl Model for AppModel {
@@ -103,6 +105,7 @@ impl Model for AppModel {
 impl AppUpdate for AppModel {
     fn update(&mut self, msg: AppMsg, components: &AppComponents, _sender: Sender<AppMsg>) -> bool {
         self.bindings_changed = false;
+        self.device_list_changed = false;
 
         match msg {
             AppMsg::RenameConfig => {}
@@ -116,15 +119,19 @@ impl AppUpdate for AppModel {
             }
             AppMsg::DeviceAdded(id) => {
                 self.devices.insert(id.clone(), Device::default());
-                self.device_id = Some(id); // XXX
-                self.bindings_changed = true;
+                if self.devices.len() == 1 {
+                    self.device_id = Some(id);
+                    self.bindings_changed = true;
+                }
+                self.device_list_changed = true;
             }
             AppMsg::DeviceRemoved(id) => {
                 self.devices.remove(&id);
                 if self.device_id == Some(id) {
                     self.device_id = None;
+                    self.bindings_changed = true;
                 }
-                self.bindings_changed = true;
+                self.device_list_changed = true;
             }
             AppMsg::Event(device_id, event) => match event {
                 Event::Battery { level, .. } => {
@@ -235,6 +242,12 @@ impl AppUpdate for AppModel {
             AppMsg::ShowAbout(visible) => {
                 self.show_about = visible;
             }
+            AppMsg::SelectDevice(device_id) => {
+                if device_id != self.device_id {
+                    self.device_id = device_id.filter(|id| self.devices.contains_key(id));
+                    self.bindings_changed = true;
+                }
+            }
         }
         true
     }
@@ -282,6 +295,18 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             }
                         }
                     },
+                    add_child: device_list_page = &gtk4::ListBox {
+                        add_css_class: "frame",
+                        set_halign: gtk4::Align::Center,
+                        set_margin_start: 12,
+                        set_margin_end: 12,
+                        set_margin_top: 12,
+                        set_margin_bottom: 12,
+                        connect_row_activated(device_rows, sender) => move |_, row| {
+                            let id = device_rows.borrow().get(row).unwrap().clone();
+                            send!(sender, AppMsg::SelectDevice(Some(id)));
+                        }
+                    },
                     add_child: device_page = &gtk4::Box {
                         set_orientation: gtk4::Orientation::Vertical,
                         set_spacing: 6,
@@ -292,6 +317,14 @@ impl Widgets<AppModel, ()> for AppWidgets {
                         set_margin_top: 12,
                         set_margin_bottom: 12,
                         append = &gtk4::Box {
+                            append = &gtk4::Button {
+                                set_halign: gtk4::Align::Center,
+                                set_label: "Device List",
+                                set_visible: watch! { model.devices.len() > 1 },
+                                connect_clicked(sender) => move |_| {
+                                    send!(sender, AppMsg::SelectDevice(None));
+                                }
+                            },
                             set_orientation: gtk4::Orientation::Horizontal,
                             set_halign: gtk4::Align::Center,
                             set_spacing: 12,
@@ -416,6 +449,11 @@ impl Widgets<AppModel, ()> for AppWidgets {
     additional_fields! {
         buttons: Vec<(Option<HardwareButton>, gtk4::Button)>,
         about_dialog: gtk4::AboutDialog,
+        device_rows: Rc<RefCell<HashMap<gtk4::ListBoxRow, DeviceId>>>,
+    }
+
+    fn pre_init() {
+        let device_rows = Rc::new(RefCell::new(HashMap::<gtk4::ListBoxRow, DeviceId>::new()));
     }
 
     fn post_init() {
@@ -475,11 +513,44 @@ impl Widgets<AppModel, ()> for AppWidgets {
     fn post_view() {
         self.about_dialog.set_visible(model.show_about);
 
-        self.stack.set_visible_child(if model.device_id.is_some() {
-            &self.device_page
+        if model.device_id.is_some() {
+            self.stack.set_visible_child(&self.device_page);
+        } else if !model.devices.is_empty() {
+            self.stack.set_visible_child(&self.device_list_page);
         } else {
-            &self.no_device_page
-        });
+            self.stack.set_visible_child(&self.no_device_page);
+        }
+
+        if model.device_list_changed {
+            let mut device_rows = self.device_rows.borrow_mut();
+
+            // Remove existing rows
+            for row in device_rows.keys() {
+                self.device_list_page.remove(row);
+            }
+            device_rows.clear();
+
+            // Add new rows
+            for (id, device) in &model.devices {
+                view! {
+                    row = gtk4::ListBoxRow {
+                        set_selectable: false,
+                        set_activatable: true,
+                        set_child = Some(&gtk4::Box) {
+                            set_orientation: gtk4::Orientation::Vertical,
+                            append = &gtk4::Label {
+                                set_label: "HP 930 series Creator Wireless Mouse" // TODO don't hard-code
+                            },
+                            append = &gtk4::Label {
+                                set_label: "Serial: XXX" // TODO
+                            }
+                        }
+                    }
+                }
+                self.device_list_page.append(&row);
+                device_rows.insert(row, id.clone());
+            }
+        }
 
         if model.bindings_changed {
             let bindings = model.device().map(|x| &x.profile.bindings);
@@ -545,6 +616,7 @@ fn main() {
         devices: HashMap::new(),
         device_id: None,
         bindings_changed: false,
+        device_list_changed: false,
         device_monitor: Some(device_monitor),
         show_about: false,
     };
