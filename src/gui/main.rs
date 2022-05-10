@@ -16,7 +16,7 @@ use device_monitor_process::DeviceMonitorProcess;
 mod dialog;
 use dialog::{DialogModel, DialogMsg};
 mod profile;
-use profile::{Binding, Profile};
+use profile::{Binding, MouseInfo, Profile};
 mod swap_button_dialog;
 use swap_button_dialog::{SwapButtonDialogModel, SwapButtonDialogMsg};
 mod worker;
@@ -31,10 +31,9 @@ struct AppComponents {
 
 #[derive(Default)]
 struct Device {
-    serial: String,
     battery_percent: u8,
-    dpi: Option<f64>,
     dpi_step: f64,
+    mouse: MouseInfo,
     profile: Profile,
 }
 
@@ -57,7 +56,7 @@ impl AppModel {
     }
 
     fn dpi(&self) -> Option<f64> {
-        self.device()?.dpi
+        self.device()?.mouse.dpi
     }
 
     // Swap left and right buttons, if in left handed mode
@@ -141,8 +140,8 @@ impl AppUpdate for AppModel {
                     ..
                 } => {
                     let device = self.devices.get_mut(&device_id).unwrap();
-                    if device.dpi.is_none() {
-                        device.dpi = Some(dpi.into());
+                    if device.mouse.dpi.is_none() {
+                        device.mouse.dpi = Some(dpi.into());
                         device.dpi_step = step_dpi.into();
                     }
                     device.profile.left_handed = left_handed;
@@ -191,7 +190,7 @@ impl AppUpdate for AppModel {
                 Event::Firmware { serial, .. } => {
                     if !self.devices.contains_key(&device_id) {
                         let device = Device {
-                            serial,
+                            mouse: MouseInfo { serial, dpi: None },
                             ..Default::default()
                         };
                         self.devices.insert(device_id.clone(), device);
@@ -214,7 +213,7 @@ impl AppUpdate for AppModel {
                     }
                 }
                 if let Some(device) = self.device_mut() {
-                    device.dpi = Some(value);
+                    device.mouse.dpi = Some(value);
                 }
             }
             AppMsg::SelectButton(button) => {
@@ -551,7 +550,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                 set_label: "HP 930 series Creator Wireless Mouse" // TODO don't hard-code
                             },
                             append = &gtk4::Label {
-                                set_label: &format!("Serial: {}", device.serial )
+                                set_label: &format!("Serial: {}", device.mouse.serial )
                             }
                         }
                     }

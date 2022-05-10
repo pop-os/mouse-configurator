@@ -23,11 +23,11 @@ pub struct Profile {
     pub left_handed: bool,
 }
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-struct MouseInfo {
+#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
+pub struct MouseInfo {
     // TODO: default?
-    dpi: f64,
-    serial: String,
+    pub dpi: Option<f64>,
+    pub serial: String,
 }
 
 struct Mouse {
