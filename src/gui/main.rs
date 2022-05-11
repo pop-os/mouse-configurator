@@ -207,10 +207,12 @@ impl AppUpdate for AppModel {
                         device.apply_profile_diff(device_id.clone(), &components.worker);
                     }
                 }
-                Event::Buttons { buttons, .. } => {
+                Event::Buttons {
+                    buttons, host_id, ..
+                } => {
                     let device = self.device_by_id_mut(&device_id).unwrap();
                     if device.state.bindings.is_none() {
-                        device.state.set_bindings_from_buttons(&buttons);
+                        device.state.set_bindings_from_buttons(host_id, &buttons);
                     }
                 }
                 Event::Firmware { serial, .. } => {

@@ -76,10 +76,13 @@ pub struct MouseState {
 }
 
 impl MouseState {
-    pub fn set_bindings_from_buttons(&mut self, buttons: &[Button]) {
+    pub fn set_bindings_from_buttons(&mut self, host_id: u8, buttons: &[Button]) {
         let mut bindings = HashMap::new();
 
         for button in buttons {
+            if button.host_id != host_id {
+                continue;
+            }
             let id = match HardwareButton::from_u8(button.id) {
                 Some(id) => id,
                 None => {
@@ -107,8 +110,6 @@ impl MouseState {
         self.bindings = Some(bindings);
     }
 }
-
-// TODO: Include option for unrecognized binding?
 
 impl MouseState {
     pub fn set_disconnected(&mut self) {
