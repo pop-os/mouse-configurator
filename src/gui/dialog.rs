@@ -7,7 +7,6 @@ use crate::{
     profile::Binding,
     AppMsg,
 };
-use hp_mouse_configurator::Button;
 
 pub enum DialogMsg {
     Show(HardwareButton),

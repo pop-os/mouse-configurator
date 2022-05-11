@@ -5,10 +5,10 @@ use relm4::{
 };
 use std::{cell::RefCell, collections::HashMap, env, process::Command, rc::Rc};
 
-use hp_mouse_configurator::{Button, Event};
+use hp_mouse_configurator::Event;
 
 mod bindings;
-use bindings::{Entry, HardwareButton};
+use bindings::HardwareButton;
 mod buttons_widget;
 use buttons_widget::{ButtonsWidget, BUTTONS, IMAGE_WIDTH};
 mod device_monitor_process;
@@ -16,11 +16,13 @@ use device_monitor_process::DeviceMonitorProcess;
 mod dialog;
 use dialog::{DialogModel, DialogMsg};
 mod profile;
-use profile::{apply_profile_diff, Binding, MouseConfig, MouseInfo, MouseState, Profile};
+use profile::{apply_profile_diff, Binding, MouseConfig, MouseState};
 mod swap_button_dialog;
 use swap_button_dialog::{SwapButtonDialogModel, SwapButtonDialogMsg};
 mod worker;
 use worker::{DeviceId, WorkerModel, WorkerMsg};
+
+const DPI_STEP: f64 = 50.;
 
 #[derive(relm4::Components)]
 struct AppComponents {
@@ -30,18 +32,32 @@ struct AppComponents {
 }
 
 struct Device {
-    dpi_step: f64,
     state: MouseState,
     config: MouseConfig,
 }
 
 impl Device {
+    fn round_dpi(&self, dpi: f64) -> u16 {
+        ((dpi / DPI_STEP).round() * DPI_STEP) as u16
+    }
+
     fn apply_profile_diff(
         &mut self,
         device_id: DeviceId,
-        worker_sender: &RelmWorker<WorkerModel, AppModel>,
+        worker: &RelmWorker<WorkerModel, AppModel>,
     ) {
-        apply_profile_diff(device_id, &self.config, &mut self.state, worker_sender);
+        apply_profile_diff(device_id, &self.config, &mut self.state, worker);
+    }
+
+    fn apply_dpi_diff(&mut self, device_id: DeviceId, worker: &RelmWorker<WorkerModel, AppModel>) {
+        if let Some(state_dpi) = self.state.dpi {
+            let new = self.round_dpi(self.config.info.dpi);
+            let old = self.round_dpi(state_dpi);
+            if old != new {
+                // XXX don't queue infinitely?
+                send!(worker, WorkerMsg::SetDpi(device_id, new));
+            }
+        }
     }
 }
 
@@ -65,10 +81,6 @@ impl AppModel {
         Some((device_id, device))
     }
 
-    fn dpi(&self) -> Option<f64> {
-        Some(self.device()?.config.info.dpi)
-    }
-
     // Swap left and right buttons, if in left handed mode
     fn swap_buttons(&self, button: Option<HardwareButton>) -> Option<HardwareButton> {
         if let Some(device) = self.device() {
@@ -82,11 +94,6 @@ impl AppModel {
         } else {
             button
         }
-    }
-
-    fn round_dpi(&self, dpi: f64) -> u16 {
-        let dpi_step = self.device().map_or(1., |x| x.dpi_step);
-        ((dpi / dpi_step).round() * dpi_step) as u16
     }
 }
 
@@ -131,7 +138,7 @@ impl AppUpdate for AppModel {
                 // Do nothing until we get `Event::Firmware`
             }
             AppMsg::DeviceRemoved(id) => {
-                if let Some(mut device) = self.devices.get_mut(&id) {
+                if let Some(device) = self.devices.get_mut(&id) {
                     device.state.set_disconnected();
                 }
             }
@@ -141,17 +148,19 @@ impl AppUpdate for AppModel {
                     device.state.battery_percent = Some(level);
                 }
                 Event::Mouse {
-                    dpi,
-                    step_dpi,
-                    left_handed,
-                    ..
+                    dpi, left_handed, ..
                 } => {
                     let device = self.devices.get_mut(&device_id).unwrap();
                     if device.state.dpi.is_none() {
                         device.state.dpi = Some(dpi.into());
                     }
-                    device.dpi_step = step_dpi.into();
-                    // TODO sync DPI
+
+                    // Sync left_handed/dpi from config
+                    if let Some((device_id, device)) = self.device_mut() {
+                        device.state.left_handed = Some(left_handed);
+                        device.apply_profile_diff(device_id.clone(), &components.worker);
+                        device.apply_dpi_diff(device_id, &components.worker);
+                    }
 
                     if self.device_id == Some(device_id) {
                         self.bindings_changed = true;
@@ -179,7 +188,6 @@ impl AppUpdate for AppModel {
                         }
                     } else if !self.devices.contains_key(&device_id) {
                         let device = Device {
-                            dpi_step: 0.,
                             state: MouseState::default(),
                             config: MouseConfig::new(serial),
                         };
@@ -194,16 +202,9 @@ impl AppUpdate for AppModel {
                 _ => {}
             },
             AppMsg::SetDpi(value) => {
-                let new = self.round_dpi(value);
-                let old = self.dpi().map(|value| self.round_dpi(value));
-                if old != Some(new) {
-                    // XXX don't queue infinitely?
-                    if let Some(device_id) = self.device_id.clone() {
-                        send!(components.worker, WorkerMsg::SetDpi(device_id, new));
-                    }
-                }
                 if let Some((device_id, device)) = self.device_mut() {
                     device.config.info.dpi = value;
+                    device.apply_dpi_diff(device_id, &components.worker);
                 }
             }
             AppMsg::SelectButton(button) => {
@@ -331,7 +332,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             append = &gtk4::Box {
                                 set_orientation: gtk4::Orientation::Horizontal,
                                 set_spacing: 6,
-                                set_visible: watch! { model.device().and_then(|x| x.state.battery_percent).is_some() },
+                                set_visible: watch! { model.device().map_or(false, |x| x.state.connected) },
                                 append = &gtk4::Image {
                                     set_from_icon_name: Some("battery-symbolic"),
                                 },
@@ -393,7 +394,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
                         append = &gtk4::ListBox {
                             add_css_class: "frame",
                             append = &gtk4::ListBoxRow {
-                                set_sensitive: watch! { model.dpi().is_some() },
                                 set_selectable: false,
                                 set_activatable: false,
                                 set_child = Some(&gtk4::Box) {
@@ -415,12 +415,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                         }
                                     },
                                     append = &gtk4::Label {
-                                        set_label: watch! { &model.dpi().map_or_else(String::new, |dpi| format!("{}", model.round_dpi(dpi))) },
+                                        set_label: watch! { &model.device().map_or_else(String::new, |device| format!("{}", device.round_dpi(device.config.info.dpi))) },
                                     },
                                     append: dpi_scale = &gtk4::Scale {
                                         set_hexpand: true,
-                                        set_adjustment: &gtk4::Adjustment::new(800., 800., 3000., 50., 50., 0.), // XXX don't hard-code? XXX 800?
-                                        set_value: watch! { model.dpi().unwrap_or(0.) },
+                                        set_adjustment: &gtk4::Adjustment::new(800., 800., 3000., DPI_STEP, DPI_STEP, 0.), // XXX don't hard-code?
+                                        set_value: watch! { model.device().map_or(0., |device| device.config.info.dpi) },
                                         connect_change_value(sender) => move |_, _, value| {
                                             send!(sender, AppMsg::SetDpi(value));
                                             gtk4::Inhibit(false)
