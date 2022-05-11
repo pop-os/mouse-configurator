@@ -18,10 +18,9 @@ use std::{
 use super::{AppMsg, DeviceMonitorProcess};
 use hp_mouse_configurator::{Button, Event, HpMouse, HpMouseEvents, ReadRes};
 
+// Opaque ID, unique for one run of program, associated with one device
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct DeviceId(usize);
-
-// XXX periodically poll for devices? what is done in keyboard configurator?
 
 pub enum WorkerMsg {
     SetDeviceMonitor(DeviceMonitorProcess),
