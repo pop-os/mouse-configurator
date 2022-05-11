@@ -16,7 +16,7 @@ use device_monitor_process::DeviceMonitorProcess;
 mod dialog;
 use dialog::{DialogModel, DialogMsg};
 mod profile;
-use profile::{Binding, MouseInfo, Profile};
+use profile::{apply_profile_diff, Binding, MouseConfig, MouseInfo, MouseState, Profile};
 mod swap_button_dialog;
 use swap_button_dialog::{SwapButtonDialogModel, SwapButtonDialogMsg};
 mod worker;
@@ -29,12 +29,20 @@ struct AppComponents {
     worker: RelmWorker<WorkerModel, AppModel>,
 }
 
-#[derive(Default)]
 struct Device {
-    battery_percent: Option<u8>,
     dpi_step: f64,
-    mouse: MouseInfo,
-    profile: Profile,
+    state: MouseState,
+    config: MouseConfig,
+}
+
+impl Device {
+    fn apply_profile_diff(
+        &mut self,
+        device_id: DeviceId,
+        worker_sender: &RelmWorker<WorkerModel, AppModel>,
+    ) {
+        apply_profile_diff(device_id, &self.config, &mut self.state, worker_sender);
+    }
 }
 
 struct AppModel {
@@ -51,20 +59,22 @@ impl AppModel {
         self.devices.get(self.device_id.as_ref()?)
     }
 
-    fn device_mut(&mut self) -> Option<&mut Device> {
-        self.devices.get_mut(self.device_id.as_ref()?)
+    fn device_mut(&mut self) -> Option<(DeviceId, &mut Device)> {
+        let device_id = self.device_id.clone()?;
+        let device = self.devices.get_mut(&device_id)?;
+        Some((device_id, device))
     }
 
     fn dpi(&self) -> Option<f64> {
-        self.device()?.mouse.dpi
+        self.device()?.config.info.dpi
     }
 
     // Swap left and right buttons, if in left handed mode
     fn swap_buttons(&self, button: Option<HardwareButton>) -> Option<HardwareButton> {
         if let Some(device) = self.device() {
-            if device.profile.left_handed && button.is_none() {
+            if device.config.profile().left_handed && button.is_none() {
                 Some(HardwareButton::Right)
-            } else if device.profile.left_handed && button == Some(HardwareButton::Right) {
+            } else if device.config.profile().left_handed && button == Some(HardwareButton::Right) {
                 None
             } else {
                 button
@@ -122,13 +132,13 @@ impl AppUpdate for AppModel {
             }
             AppMsg::DeviceRemoved(id) => {
                 if let Some(mut device) = self.devices.get_mut(&id) {
-                    device.battery_percent = None;
+                    device.state.battery_percent = None;
                 }
             }
             AppMsg::Event(device_id, event) => match event {
                 Event::Battery { level, .. } => {
                     let device = self.devices.get_mut(&device_id).unwrap();
-                    device.battery_percent = Some(level);
+                    device.state.battery_percent = Some(level);
                 }
                 Event::Mouse {
                     dpi,
@@ -137,70 +147,41 @@ impl AppUpdate for AppModel {
                     ..
                 } => {
                     let device = self.devices.get_mut(&device_id).unwrap();
-                    if device.mouse.dpi.is_none() {
-                        device.mouse.dpi = Some(dpi.into());
-                        device.dpi_step = step_dpi.into();
+                    if device.state.dpi.is_none() {
+                        device.state.dpi = Some(dpi.into());
                     }
-                    device.profile.left_handed = left_handed;
+                    device.dpi_step = step_dpi.into();
+                    // TODO sync DPI
 
                     if self.device_id == Some(device_id) {
                         self.bindings_changed = true;
                     }
                 }
                 Event::Buttons { buttons, .. } => {
-                    let bindings = &mut self.devices.get_mut(&device_id).unwrap().profile.bindings;
-                    // Reset `self.bindings` to defaults
-                    bindings.clear();
-                    for (_, _, _, id) in BUTTONS {
-                        if let Some(id) = id {
-                            bindings.insert(*id, Binding::Preset(id.def_binding().id));
-                        }
-                    }
-
-                    for button in buttons {
-                        let id = match HardwareButton::from_u8(button.id) {
-                            Some(id) => id,
-                            None => {
-                                eprintln!("Unrecognized button id: {}", button.id);
-                                continue;
-                            }
-                        };
-                        match button.decode_action() {
-                            Ok(action) => {
-                                if let Some(entry) = Entry::for_binding(&action) {
-                                    bindings.insert(id, Binding::Preset(entry.id));
-                                } else {
-                                    bindings.remove(&id);
-                                    eprintln!("Unrecognized action: {:?}", action);
-                                }
-                            }
-                            Err(err) => {
-                                eprintln!("Unable to decode button action: {}", err);
-                            }
-                        }
-                    }
-
-                    if self.device_id == Some(device_id) {
-                        self.bindings_changed = true;
+                    let device = self.devices.get_mut(&device_id).unwrap();
+                    if device.state.bindings.is_none() {
+                        device.state.set_bindings_from_buttons(&buttons);
                     }
                 }
                 Event::Firmware { serial, .. } => {
                     let old_id = self
                         .devices
                         .iter()
-                        .filter(|(_k, v)| &v.mouse.serial == &serial)
+                        .filter(|(_k, v)| &v.config.info.serial == &serial)
                         .next()
                         .map(|(k, _v)| k.clone());
                     if let Some(old_id) = old_id {
-                        let device = self.devices.remove(&old_id).unwrap();
+                        let mut device = self.devices.remove(&old_id).unwrap();
+                        device.state.set_connected();
                         self.devices.insert(device_id.clone(), device);
                         if self.device_id == Some(old_id) {
                             self.device_id = Some(device_id);
                         }
                     } else if !self.devices.contains_key(&device_id) {
                         let device = Device {
-                            mouse: MouseInfo { serial, dpi: None },
-                            ..Default::default()
+                            dpi_step: 0.,
+                            state: MouseState::default(),
+                            config: MouseConfig::new(serial),
                         };
                         self.devices.insert(device_id.clone(), device);
                         if self.devices.len() == 1 {
@@ -221,8 +202,8 @@ impl AppUpdate for AppModel {
                         send!(components.worker, WorkerMsg::SetDpi(device_id, new));
                     }
                 }
-                if let Some(device) = self.device_mut() {
-                    device.mouse.dpi = Some(value);
+                if let Some((device_id, device)) = self.device_mut() {
+                    device.config.info.dpi = Some(value);
                 }
             }
             AppMsg::SelectButton(button) => {
@@ -230,7 +211,9 @@ impl AppUpdate for AppModel {
                 if let Some(id) = button {
                     send!(components.dialog, DialogMsg::Show(id as u8))
                 } else {
-                    let left_handed = self.device().map_or(false, |x| x.profile.left_handed);
+                    let left_handed = self
+                        .device()
+                        .map_or(false, |x| x.config.profile().left_handed);
                     send!(
                         components.swap_button_dialog,
                         SwapButtonDialogMsg::Show(left_handed)
@@ -244,11 +227,9 @@ impl AppUpdate for AppModel {
                 }
             }
             AppMsg::SetLeftHanded(left_handed) => {
-                if let Some(device_id) = self.device_id.clone() {
-                    send!(
-                        components.worker,
-                        WorkerMsg::SetLeftHanded(device_id, left_handed)
-                    );
+                if let Some((device_id, device)) = self.device_mut() {
+                    device.config.profile_mut().left_handed = left_handed;
+                    device.apply_profile_diff(device_id, &components.worker);
                 }
             }
             AppMsg::Reset => {
@@ -350,12 +331,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             append = &gtk4::Box {
                                 set_orientation: gtk4::Orientation::Horizontal,
                                 set_spacing: 6,
-                                set_visible: watch! { model.device().and_then(|x| x.battery_percent).is_some() },
+                                set_visible: watch! { model.device().and_then(|x| x.state.battery_percent).is_some() },
                                 append = &gtk4::Image {
                                     set_from_icon_name: Some("battery-symbolic"),
                                 },
                                 append = &gtk4::Label {
-                                    set_label: watch! { &format!("{}%", model.device().and_then(|x| x.battery_percent).unwrap_or(0)) }
+                                    set_label: watch! { &format!("{}%", model.device().and_then(|x| x.state.battery_percent).unwrap_or(0)) }
                                 },
                             },
                             append = &gtk4::Box {
@@ -562,7 +543,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                 set_label: "HP 930 series Creator Wireless Mouse" // TODO don't hard-code
                             },
                             append = &gtk4::Label {
-                                set_label: &format!("Serial: {}", device.mouse.serial )
+                                set_label: &format!("Serial: {}", device.config.info.serial )
                             }
                         }
                     }
@@ -573,7 +554,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
         }
 
         if model.bindings_changed {
-            let bindings = model.device().map(|x| &x.profile.bindings);
+            let bindings = model.device().map(|x| &x.config.profile().bindings);
             for (id, button) in &self.buttons {
                 if let Some(id) = model.swap_buttons(*id) {
                     button.set_label(
