@@ -66,7 +66,7 @@ impl AppModel {
     }
 
     fn dpi(&self) -> Option<f64> {
-        self.device()?.config.info.dpi
+        Some(self.device()?.config.info.dpi)
     }
 
     // Swap left and right buttons, if in left handed mode
@@ -98,7 +98,7 @@ enum AppMsg {
     RenameConfig,
     Event(DeviceId, Event),
     SetDpi(f64),
-    SetBinding(Button),
+    SetBinding(HardwareButton, Binding),
     SelectButton(Option<HardwareButton>),
     SetLeftHanded(bool),
     Reset,
@@ -132,7 +132,7 @@ impl AppUpdate for AppModel {
             }
             AppMsg::DeviceRemoved(id) => {
                 if let Some(mut device) = self.devices.get_mut(&id) {
-                    device.state.battery_percent = None;
+                    device.state.set_disconnected();
                 }
             }
             AppMsg::Event(device_id, event) => match event {
@@ -203,13 +203,13 @@ impl AppUpdate for AppModel {
                     }
                 }
                 if let Some((device_id, device)) = self.device_mut() {
-                    device.config.info.dpi = Some(value);
+                    device.config.info.dpi = value;
                 }
             }
             AppMsg::SelectButton(button) => {
                 let button = self.swap_buttons(button);
                 if let Some(id) = button {
-                    send!(components.dialog, DialogMsg::Show(id as u8))
+                    send!(components.dialog, DialogMsg::Show(id))
                 } else {
                     let left_handed = self
                         .device()
@@ -220,10 +220,10 @@ impl AppUpdate for AppModel {
                     );
                 }
             }
-            AppMsg::SetBinding(button) => {
-                // TODO fewer layers of indirection?
-                if let Some(device_id) = self.device_id.clone() {
-                    send!(components.worker, WorkerMsg::SetBinding(device_id, button));
+            AppMsg::SetBinding(button, binding) => {
+                if let Some((device_id, device)) = self.device_mut() {
+                    device.config.profile_mut().bindings.insert(button, binding);
+                    device.apply_profile_diff(device_id, &components.worker);
                 }
             }
             AppMsg::SetLeftHanded(left_handed) => {
@@ -560,7 +560,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     button.set_label(
                         &bindings
                             .and_then(|x| x.get(&id))
-                            .map_or_else(|| "Unknown".to_string(), |x| x.label()),
+                            .map_or_else(|| id.def_binding().label.to_string(), |x| x.label()),
                     );
                 } else {
                     button.set_label("Left Click");

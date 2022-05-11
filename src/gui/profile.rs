@@ -29,10 +29,9 @@ pub struct Profile {
     pub left_handed: bool,
 }
 
-#[derive(Clone, Default, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct MouseInfo {
-    // TODO: default?
-    pub dpi: Option<f64>,
+    pub dpi: f64,
     pub serial: String,
 }
 
@@ -46,11 +45,12 @@ pub struct MouseConfig {
 }
 
 impl MouseConfig {
+    // XXX Default DPI should depend on device model
     pub fn new(serial: String) -> Self {
         Self {
             profiles: vec![Profile::default()],
             profile_num: 0,
-            info: MouseInfo { dpi: None, serial },
+            info: MouseInfo { dpi: 1200., serial },
         }
     }
 

@@ -3,21 +3,21 @@ use relm4::{send, view, ComponentUpdate, Model, Sender, Widgets};
 use std::collections::HashMap;
 
 use crate::{
-    bindings::{Entry, BINDINGS},
+    bindings::{Entry, HardwareButton, BINDINGS},
+    profile::Binding,
     AppMsg,
 };
 use hp_mouse_configurator::Button;
 
 pub enum DialogMsg {
-    Show(u8),
+    Show(HardwareButton),
     #[allow(unused)]
     Hide,
     Selected(&'static Entry),
 }
 
-#[derive(Default)]
 pub struct DialogModel {
-    button_id: u8,
+    button_id: HardwareButton,
     shown: bool,
 }
 
@@ -29,7 +29,10 @@ impl Model for DialogModel {
 
 impl ComponentUpdate<super::AppModel> for DialogModel {
     fn init_model(_parent_model: &super::AppModel) -> Self {
-        DialogModel::default()
+        DialogModel {
+            button_id: HardwareButton::Right,
+            shown: false,
+        }
     }
 
     fn update(
@@ -48,8 +51,10 @@ impl ComponentUpdate<super::AppModel> for DialogModel {
                 self.shown = false;
             }
             DialogMsg::Selected(entry) => {
-                let button = Button::new(self.button_id, 1, 0, &entry.binding); // XXX
-                send!(parent_sender, AppMsg::SetBinding(button));
+                send!(
+                    parent_sender,
+                    AppMsg::SetBinding(self.button_id, Binding::Preset(entry.id))
+                );
                 self.shown = false;
             }
         }
