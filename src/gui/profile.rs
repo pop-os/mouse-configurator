@@ -13,12 +13,15 @@ use hp_mouse_configurator::Button;
 pub enum Binding {
     Preset(PresetBinding),
     // TODO Custom
+    // Binding read from device, that isn't recognized
+    Unknown,
 }
 
 impl Binding {
     pub fn label(&self) -> String {
         match self {
             Binding::Preset(binding) => binding.entry().label.to_string(),
+            Binding::Unknown => "Unknown".to_string(),
         }
     }
 }
@@ -84,18 +87,21 @@ impl MouseState {
                     continue;
                 }
             };
-            match button.decode_action() {
+            let binding = match button.decode_action() {
                 Ok(action) => {
                     if let Some(entry) = Entry::for_binding(&action) {
-                        bindings.insert(id, Binding::Preset(entry.id));
+                        Binding::Preset(entry.id)
                     } else {
                         eprintln!("Unrecognized action: {:?}", action);
+                        Binding::Unknown
                     }
                 }
                 Err(err) => {
                     eprintln!("Unable to decode button action: {}", err);
+                    Binding::Unknown
                 }
-            }
+            };
+            bindings.insert(id, binding);
         }
 
         self.bindings = Some(bindings);
@@ -136,6 +142,9 @@ pub(super) fn apply_profile_diff(
                 }
                 let binding = match config_binding {
                     Some(Binding::Preset(preset)) => &preset.entry().binding,
+                    Some(Binding::Unknown) => {
+                        continue;
+                    } // Shouldn't occur
                     None => &[] as &[_],
                 };
                 let button = Button::new(i as u8, 1, 0, binding); // XXX
