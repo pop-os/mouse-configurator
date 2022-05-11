@@ -22,6 +22,10 @@ pub enum HardwareButton {
 }
 
 impl HardwareButton {
+    pub fn iter() -> impl Iterator<Item = Self> {
+        (0..7).map(|i| Self::from_u8(i).unwrap())
+    }
+
     pub fn from_u8(num: u8) -> Option<Self> {
         match num {
             0 => Some(Self::Right),
