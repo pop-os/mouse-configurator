@@ -116,6 +116,16 @@ impl AppModel {
         }
     }
 
+    fn remove_device_id(&mut self, id: &DeviceId) {
+        if let Some(idx) = self.device_by_id.remove(id) {
+            let device = &mut self.devices[idx];
+            if device.id.as_ref() == Some(id) {
+                device.state.set_disconnected();
+                device.id = None;
+            }
+        }
+    }
+
     // Swap left and right buttons, if in left handed mode
     fn swap_buttons(&self, button: Option<HardwareButton>) -> Option<HardwareButton> {
         if let Some(device) = self.device() {
@@ -173,9 +183,7 @@ impl AppUpdate for AppModel {
                 // Do nothing until we get `Event::Firmware`
             }
             AppMsg::DeviceRemoved(id) => {
-                if let Some(device) = self.device_by_id_mut(&id) {
-                    device.state.set_disconnected();
-                }
+                self.remove_device_id(&id);
             }
             AppMsg::Event(device_id, event) => match event {
                 Event::Battery { level, .. } => {
