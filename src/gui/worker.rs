@@ -30,7 +30,6 @@ pub enum WorkerMsg {
     SetLeftHanded(DeviceId, bool),
     SetBinding(DeviceId, Button),
     HasFirmware(DeviceId),
-    Reset(DeviceId),
 }
 
 pub struct WorkerModel {
@@ -124,12 +123,6 @@ impl ComponentUpdate<super::AppModel> for WorkerModel {
                 if let Some((_, mouse)) = &self.devices.get(&id) {
                     // XXX error
                     let _ = mouse.set_button(button, false);
-                }
-            }
-            WorkerMsg::Reset(id) => {
-                if let Some((_, mouse)) = &self.devices.get(&id) {
-                    // XXX error
-                    let _ = mouse.reset();
                 }
             }
         }

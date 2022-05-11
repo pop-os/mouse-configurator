@@ -234,8 +234,15 @@ impl AppUpdate for AppModel {
                 }
             }
             AppMsg::Reset => {
-                if let Some(device_id) = self.device_id.clone() {
-                    send!(components.worker, WorkerMsg::Reset(device_id));
+                if let Some((device_id, device)) = self.device_mut() {
+                    device.config.profile_mut().bindings.clear();
+                    device.config.profile_mut().left_handed = false;
+                    device.config.info.dpi = 1200.; // XXX depend on device
+
+                    // TODO handle profiles
+
+                    device.apply_profile_diff(device_id.clone(), &components.worker);
+                    device.apply_dpi_diff(device_id, &components.worker);
                 }
             }
             AppMsg::ShowAbout(visible) => {
