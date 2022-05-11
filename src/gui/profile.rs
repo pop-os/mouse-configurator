@@ -148,7 +148,7 @@ pub(super) fn apply_profile_diff(
                     } // Shouldn't occur
                     None => &[] as &[_],
                 };
-                let button = Button::new(i as u8, 1, 0, binding); // XXX
+                let button = Button::new(i as u8, 0, 0, binding); // XXX
                 send!(worker, WorkerMsg::SetBinding(device_id.clone(), button));
             }
         }
