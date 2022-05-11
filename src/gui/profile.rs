@@ -2,7 +2,7 @@ use relm4::{send, Sender};
 use std::{collections::HashMap, env, path::PathBuf};
 
 use super::{
-    bindings::{HardwareButton, PresetBinding},
+    bindings::{Entry, HardwareButton, PresetBinding},
     worker::{DeviceId, WorkerMsg},
 };
 use hp_mouse_configurator::Button;
@@ -56,8 +56,40 @@ struct MouseState {
     connected: bool,
     battery_percent: Option<u8>,
     dpi: Option<f64>,
-    profile: Option<Profile>,
+    bindings: Option<HashMap<HardwareButton, Binding>>,
+    left_handed: Option<bool>,
 }
+
+impl MouseState {
+    fn set_bindings_from_buttons(&mut self, buttons: &[Button]) {
+        let mut bindings = HashMap::new();
+
+        for button in buttons {
+            let id = match HardwareButton::from_u8(button.id) {
+                Some(id) => id,
+                None => {
+                    eprintln!("Unrecognized button id: {}", button.id);
+                    continue;
+                }
+            };
+            match button.decode_action() {
+                Ok(action) => {
+                    if let Some(entry) = Entry::for_binding(&action) {
+                        bindings.insert(id, Binding::Preset(entry.id));
+                    } else {
+                        eprintln!("Unrecognized action: {:?}", action);
+                    }
+                }
+                Err(err) => {
+                    eprintln!("Unable to decode button action: {}", err);
+                }
+            }
+        }
+
+        self.bindings = Some(bindings);
+    }
+}
+
 // TODO: way to convert state on device to profile? Include option for unrecognized binding?
 // left_handed is sent seperately from bindings?
 
@@ -74,16 +106,16 @@ fn apply_profile_diff(
     state: &mut MouseState,
     sender: Sender<WorkerMsg>,
 ) {
-    match (config.profile(), &mut state.profile) {
-        (Some(config_profile), Some(state_profile)) => {
+    if let Some(config_profile) = config.profile() {
+        if let Some(state_bindings) = state.bindings.as_mut() {
             for i in HardwareButton::iter() {
                 let config_binding = config_profile.bindings.get(&i);
-                let state_binding = state_profile.bindings.get(&i);
+                let state_binding = state_bindings.get(&i);
                 if state_binding != config_binding {
                     if let Some(binding) = config_binding {
-                        state_profile.bindings.insert(i, binding.clone());
+                        state_bindings.insert(i, binding.clone());
                     } else {
-                        state_profile.bindings.remove(&i);
+                        state_bindings.remove(&i);
                     }
                     let binding = match config_binding {
                         Some(Binding::Preset(preset)) => &preset.entry().binding,
@@ -93,16 +125,17 @@ fn apply_profile_diff(
                     send!(sender, WorkerMsg::SetBinding(device_id.clone(), button));
                 }
             }
+        }
 
-            if state_profile.left_handed != config_profile.left_handed {
-                state_profile.left_handed = config_profile.left_handed;
+        if let Some(state_left_handed) = state.left_handed.as_mut() {
+            if *state_left_handed != config_profile.left_handed {
+                *state_left_handed = config_profile.left_handed;
                 send!(
                     sender,
                     WorkerMsg::SetLeftHanded(device_id, config_profile.left_handed)
                 );
             }
         }
-        _ => {}
     }
 }
 
