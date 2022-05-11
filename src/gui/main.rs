@@ -81,6 +81,10 @@ impl AppModel {
         Some((device_id, device))
     }
 
+    fn device_by_id_mut(&mut self, id: &DeviceId) -> Option<&mut Device> {
+        self.devices.get_mut(id)
+    }
+
     // Swap left and right buttons, if in left handed mode
     fn swap_buttons(&self, button: Option<HardwareButton>) -> Option<HardwareButton> {
         if let Some(device) = self.device() {
@@ -138,19 +142,19 @@ impl AppUpdate for AppModel {
                 // Do nothing until we get `Event::Firmware`
             }
             AppMsg::DeviceRemoved(id) => {
-                if let Some(device) = self.devices.get_mut(&id) {
+                if let Some(device) = self.device_by_id_mut(&id) {
                     device.state.set_disconnected();
                 }
             }
             AppMsg::Event(device_id, event) => match event {
                 Event::Battery { level, .. } => {
-                    let device = self.devices.get_mut(&device_id).unwrap();
+                    let device = self.device_by_id_mut(&device_id).unwrap();
                     device.state.battery_percent = Some(level);
                 }
                 Event::Mouse {
                     dpi, left_handed, ..
                 } => {
-                    let device = self.devices.get_mut(&device_id).unwrap();
+                    let device = self.device_by_id_mut(&device_id).unwrap();
                     if device.state.dpi.is_none() {
                         device.state.dpi = Some(dpi.into());
                     }
@@ -167,7 +171,7 @@ impl AppUpdate for AppModel {
                     }
                 }
                 Event::Buttons { buttons, .. } => {
-                    let device = self.devices.get_mut(&device_id).unwrap();
+                    let device = self.device_by_id_mut(&device_id).unwrap();
                     if device.state.bindings.is_none() {
                         device.state.set_bindings_from_buttons(&buttons);
                     }
