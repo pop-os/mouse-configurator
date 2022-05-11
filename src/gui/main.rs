@@ -3,7 +3,7 @@ use relm4::{
     actions::{RelmAction, RelmActionGroup},
     send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets,
 };
-use std::{cell::RefCell, collections::HashMap, env, process::Command, rc::Rc};
+use std::{collections::HashMap, env, process::Command};
 
 use hp_mouse_configurator::Event;
 
@@ -32,6 +32,7 @@ struct AppComponents {
 }
 
 struct Device {
+    id: Option<DeviceId>,
     state: MouseState,
     config: MouseConfig,
 }
@@ -62,8 +63,10 @@ impl Device {
 }
 
 struct AppModel {
-    devices: HashMap<DeviceId, Device>,
-    device_id: Option<DeviceId>,
+    devices: Vec<Device>,
+    // Index in devices. Must update on remove.
+    device_by_id: HashMap<DeviceId, usize>,
+    selected_device: Option<usize>,
     bindings_changed: bool,
     device_list_changed: bool,
     device_monitor: Option<DeviceMonitorProcess>,
@@ -72,17 +75,45 @@ struct AppModel {
 
 impl AppModel {
     fn device(&self) -> Option<&Device> {
-        self.devices.get(self.device_id.as_ref()?)
+        Some(&self.devices[self.selected_device?])
     }
 
-    fn device_mut(&mut self) -> Option<(DeviceId, &mut Device)> {
-        let device_id = self.device_id.clone()?;
-        let device = self.devices.get_mut(&device_id)?;
-        Some((device_id, device))
+    fn device_mut(&mut self) -> Option<&mut Device> {
+        Some(&mut self.devices[self.selected_device?])
     }
 
     fn device_by_id_mut(&mut self, id: &DeviceId) -> Option<&mut Device> {
-        self.devices.get_mut(id)
+        Some(&mut self.devices[*self.device_by_id.get(id)?])
+    }
+
+    fn add_or_update_device(&mut self, device_id: DeviceId, serial: String) {
+        if let Some(idx) = self
+            .devices
+            .iter()
+            .position(|d| d.config.info.serial == serial)
+        {
+            let mut device = &mut self.devices[idx];
+            if let Some(old_id) = &device.id {
+                self.device_by_id.remove(&old_id);
+            }
+            device.state.set_connected();
+            device.id = device.id.clone();
+            self.device_by_id.insert(device_id.clone(), idx);
+        } else {
+            let device = Device {
+                id: Some(device_id.clone()),
+                state: MouseState::default(),
+                config: MouseConfig::new(serial),
+            };
+            self.devices.push(device);
+            let idx = self.devices.len() - 1;
+            self.device_by_id.insert(device_id.clone(), idx);
+            if idx == 0 {
+                self.selected_device = Some(0);
+                self.bindings_changed = true;
+            }
+            self.device_list_changed = true;
+        }
     }
 
     // Swap left and right buttons, if in left handed mode
@@ -114,7 +145,7 @@ enum AppMsg {
     SetLeftHanded(bool),
     Reset,
     ShowAbout(bool),
-    SelectDevice(Option<DeviceId>),
+    SelectDevice(Option<usize>),
 }
 
 impl Model for AppModel {
@@ -155,19 +186,17 @@ impl AppUpdate for AppModel {
                     dpi, left_handed, ..
                 } => {
                     let device = self.device_by_id_mut(&device_id).unwrap();
+
+                    // Sync dpi from config
                     if device.state.dpi.is_none() {
                         device.state.dpi = Some(dpi.into());
+                        device.apply_dpi_diff(device_id.clone(), &components.worker);
                     }
 
-                    // Sync left_handed/dpi from config
-                    if let Some((device_id, device)) = self.device_mut() {
+                    // Sync left_handed from config
+                    if device.state.left_handed.is_none() {
                         device.state.left_handed = Some(left_handed);
                         device.apply_profile_diff(device_id.clone(), &components.worker);
-                        device.apply_dpi_diff(device_id, &components.worker);
-                    }
-
-                    if self.device_id == Some(device_id) {
-                        self.bindings_changed = true;
                     }
                 }
                 Event::Buttons { buttons, .. } => {
@@ -177,38 +206,16 @@ impl AppUpdate for AppModel {
                     }
                 }
                 Event::Firmware { serial, .. } => {
-                    let old_id = self
-                        .devices
-                        .iter()
-                        .filter(|(_k, v)| &v.config.info.serial == &serial)
-                        .next()
-                        .map(|(k, _v)| k.clone());
-                    if let Some(old_id) = old_id {
-                        let mut device = self.devices.remove(&old_id).unwrap();
-                        device.state.set_connected();
-                        self.devices.insert(device_id.clone(), device);
-                        if self.device_id == Some(old_id) {
-                            self.device_id = Some(device_id);
-                        }
-                    } else if !self.devices.contains_key(&device_id) {
-                        let device = Device {
-                            state: MouseState::default(),
-                            config: MouseConfig::new(serial),
-                        };
-                        self.devices.insert(device_id.clone(), device);
-                        if self.devices.len() == 1 {
-                            self.device_id = Some(device_id);
-                            self.bindings_changed = true;
-                        }
-                        self.device_list_changed = true;
-                    }
+                    self.add_or_update_device(device_id, serial);
                 }
                 _ => {}
             },
             AppMsg::SetDpi(value) => {
-                if let Some((device_id, device)) = self.device_mut() {
+                if let Some(device) = self.device_mut() {
                     device.config.info.dpi = value;
-                    device.apply_dpi_diff(device_id, &components.worker);
+                    if let Some(device_id) = device.id.clone() {
+                        device.apply_dpi_diff(device_id, &components.worker);
+                    }
                 }
             }
             AppMsg::SelectButton(button) => {
@@ -226,35 +233,42 @@ impl AppUpdate for AppModel {
                 }
             }
             AppMsg::SetBinding(button, binding) => {
-                if let Some((device_id, device)) = self.device_mut() {
+                if let Some(device) = self.device_mut() {
                     device.config.profile_mut().bindings.insert(button, binding);
-                    device.apply_profile_diff(device_id, &components.worker);
+                    if let Some(device_id) = device.id.clone() {
+                        device.apply_profile_diff(device_id, &components.worker);
+                    }
+                    self.bindings_changed = true;
                 }
             }
             AppMsg::SetLeftHanded(left_handed) => {
-                if let Some((device_id, device)) = self.device_mut() {
+                if let Some(device) = self.device_mut() {
                     device.config.profile_mut().left_handed = left_handed;
-                    device.apply_profile_diff(device_id, &components.worker);
+                    if let Some(device_id) = device.id.clone() {
+                        device.apply_profile_diff(device_id, &components.worker);
+                    }
                 }
             }
             AppMsg::Reset => {
-                if let Some((device_id, device)) = self.device_mut() {
+                if let Some(device) = self.device_mut() {
                     device.config.profile_mut().bindings.clear();
                     device.config.profile_mut().left_handed = false;
                     device.config.info.dpi = 1200.; // XXX depend on device
 
                     // TODO handle profiles
 
-                    device.apply_profile_diff(device_id.clone(), &components.worker);
-                    device.apply_dpi_diff(device_id, &components.worker);
+                    if let Some(device_id) = device.id.clone() {
+                        device.apply_profile_diff(device_id.clone(), &components.worker);
+                        device.apply_dpi_diff(device_id, &components.worker);
+                    }
                 }
             }
             AppMsg::ShowAbout(visible) => {
                 self.show_about = visible;
             }
-            AppMsg::SelectDevice(device_id) => {
-                if device_id != self.device_id {
-                    self.device_id = device_id.filter(|id| self.devices.contains_key(id));
+            AppMsg::SelectDevice(idx) => {
+                if idx != self.selected_device {
+                    self.selected_device = idx.filter(|idx| *idx < self.devices.len());
                     self.bindings_changed = true;
                 }
             }
@@ -314,9 +328,9 @@ impl Widgets<AppModel, ()> for AppWidgets {
                         set_margin_end: 12,
                         set_margin_top: 12,
                         set_margin_bottom: 12,
-                        connect_row_activated(device_rows, sender) => move |_, row| {
-                            let id = device_rows.borrow().get(row).unwrap().clone();
-                            send!(sender, AppMsg::SelectDevice(Some(id)));
+                        connect_row_activated(sender) => move |_, row| {
+                            let idx = usize::try_from(row.index()).ok();
+                            send!(sender, AppMsg::SelectDevice(idx));
                         }
                     },
                     add_child: device_page = &gtk4::Box {
@@ -461,11 +475,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
     additional_fields! {
         buttons: Vec<(Option<HardwareButton>, gtk4::Button)>,
         about_dialog: gtk4::AboutDialog,
-        device_rows: Rc<RefCell<HashMap<gtk4::ListBoxRow, DeviceId>>>,
-    }
-
-    fn pre_init() {
-        let device_rows = Rc::new(RefCell::new(HashMap::<gtk4::ListBoxRow, DeviceId>::new()));
     }
 
     fn post_init() {
@@ -525,7 +534,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
     fn post_view() {
         self.about_dialog.set_visible(model.show_about);
 
-        if model.device_id.is_some() {
+        if model.selected_device.is_some() {
             self.stack.set_visible_child(&self.device_page);
         } else if !model.devices.is_empty() {
             self.stack.set_visible_child(&self.device_list_page);
@@ -534,16 +543,13 @@ impl Widgets<AppModel, ()> for AppWidgets {
         }
 
         if model.device_list_changed {
-            let mut device_rows = self.device_rows.borrow_mut();
-
             // Remove existing rows
-            for row in device_rows.keys() {
-                self.device_list_page.remove(row);
+            while let Some(row) = self.device_list_page.first_child() {
+                self.device_list_page.remove(&row);
             }
-            device_rows.clear();
 
             // Add new rows
-            for (id, device) in &model.devices {
+            for device in &model.devices {
                 view! {
                     row = gtk4::ListBoxRow {
                         set_selectable: false,
@@ -560,7 +566,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     }
                 }
                 self.device_list_page.append(&row);
-                device_rows.insert(row, id.clone());
             }
         }
 
@@ -625,8 +630,9 @@ fn main() {
     );
 
     let model = AppModel {
-        devices: HashMap::new(),
-        device_id: None,
+        devices: Vec::new(),
+        device_by_id: HashMap::new(),
+        selected_device: None,
         bindings_changed: false,
         device_list_changed: false,
         device_monitor: Some(device_monitor),
