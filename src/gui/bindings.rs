@@ -41,15 +41,15 @@ impl HardwareButton {
 
     pub fn def_binding(self) -> &'static Entry {
         match self {
-            Self::Right => Entry::for_binding(&[Op::mouse(true, 2, 0, 0, 0, 0)]),
-            Self::Middle => Entry::for_binding(&[Op::mouse(true, 4, 0, 0, 0, 0)]),
-            Self::LeftBottom => Entry::for_binding(&[Op::mouse(true, 8, 0, 0, 0, 0)]),
-            Self::LeftTop => Entry::for_binding(&[Op::mouse(true, 16, 0, 0, 0, 0)]),
-            Self::ScrollLeft => Entry::for_binding(&[Op::mouse(false, 0, 0, 0, 0, -1)]), // XXX not same as default?
-            Self::ScrollRight => Entry::for_binding(&[Op::mouse(false, 0, 0, 0, 0, 1)]),
-            Self::LeftCenter => Entry::for_binding(&[Op::key(true, vec![Const(0), Const(0x2B)])]),
+            Self::Right => PresetBinding::RightClick,
+            Self::Middle => PresetBinding::MiddleClick,
+            Self::LeftBottom => PresetBinding::Back,
+            Self::LeftTop => PresetBinding::Forward,
+            Self::ScrollLeft => PresetBinding::ScrollLeft, // XXX not same as default?
+            Self::ScrollRight => PresetBinding::ScrollRight,
+            Self::LeftCenter => PresetBinding::SwitchApp,
         }
-        .unwrap()
+        .entry()
     }
 }
 
