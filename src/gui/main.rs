@@ -20,6 +20,7 @@ mod profile;
 use profile::{apply_profile_diff, load_config, save_config, Binding, MouseConfig, MouseState};
 mod swap_button_dialog;
 use swap_button_dialog::{SwapButtonDialogModel, SwapButtonDialogMsg};
+mod util;
 mod worker;
 use worker::{DeviceId, WorkerModel, WorkerMsg};
 
@@ -358,7 +359,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     },
                     add_child: device_list_page = &gtk4::ListBox {
                         add_css_class: "frame",
-                        set_header_func: header_func,
+                        set_header_func: util::header_func,
                         set_halign: gtk4::Align::Center,
                         set_valign: gtk4::Align::Center,
                         set_margin_start: 12,
@@ -719,12 +720,4 @@ fn main() {
 
     let app = RelmApp::with_app(AppModel::new(device_monitor), app);
     app.run();
-}
-
-fn header_func(row: &gtk4::ListBoxRow, before: Option<&gtk4::ListBoxRow>) {
-    if before.is_none() {
-        row.set_header(None::<&gtk4::Widget>)
-    } else if row.header().is_none() {
-        row.set_header(Some(&gtk4::Separator::new(gtk4::Orientation::Horizontal)));
-    }
 }

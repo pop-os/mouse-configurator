@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::{
     bindings::{Entry, HardwareButton, BINDINGS},
     profile::Binding,
-    AppMsg,
+    util, AppMsg,
 };
 
 pub enum DialogMsg {
@@ -100,7 +100,7 @@ impl Widgets<DialogModel, super::AppModel> for DialogWidgets {
                 list_box = gtk4::ListBox {
                     set_hexpand: true,
                     add_css_class: "frame",
-                    set_header_func: header_func,
+                    set_header_func: util::header_func,
                 }
             }
             vbox.append(&label);
@@ -131,13 +131,5 @@ impl Widgets<DialogModel, super::AppModel> for DialogWidgets {
                 send!(sender, DialogMsg::Selected(rows.get(row).unwrap()));
             });
         }
-    }
-}
-
-fn header_func(row: &gtk4::ListBoxRow, before: Option<&gtk4::ListBoxRow>) {
-    if before.is_none() {
-        row.set_header(None::<&gtk4::Widget>)
-    } else if row.header().is_none() {
-        row.set_header(Some(&gtk4::Separator::new(gtk4::Orientation::Horizontal)));
     }
 }
