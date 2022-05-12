@@ -72,7 +72,6 @@ struct AppModel {
     bindings_changed: bool,
     device_list_changed: bool,
     device_monitor: Option<DeviceMonitorProcess>,
-    show_about: bool,
 }
 
 impl AppModel {
@@ -93,7 +92,6 @@ impl AppModel {
             bindings_changed: false,
             device_list_changed: false,
             device_monitor,
-            show_about: false,
         }
     }
 
@@ -186,7 +184,6 @@ enum AppMsg {
     SelectButton(Option<HardwareButton>),
     SetLeftHanded(bool),
     Reset,
-    ShowAbout(bool),
     SelectDevice(Option<usize>),
     SaveConfig,
 }
@@ -309,9 +306,6 @@ impl AppUpdate for AppModel {
                         device.apply_dpi_diff(device_id, &components.worker);
                     }
                 }
-            }
-            AppMsg::ShowAbout(visible) => {
-                self.show_about = visible;
             }
             AppMsg::SelectDevice(idx) => {
                 if idx != self.selected_device {
@@ -527,7 +521,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
 
     additional_fields! {
         buttons: Vec<(Option<HardwareButton>, gtk4::Button)>,
-        about_dialog: gtk4::AboutDialog,
         first_view_run: bool,
         desktop_settings: gio::Settings,
         device_actions: gio::SimpleActionGroup
@@ -561,19 +554,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
         );
         update_theme(&desktop_settings, &mouse_picture);
 
-        let about_dialog = gtk4::AboutDialog::builder()
-            .transient_for(&main_window)
-            .hide_on_close(true)
-            .version(env!("CARGO_PKG_VERSION"))
-            .logo_icon_name("input-mouse-symbolic") // TODO
-            .copyright("Copyright 2022 Hewlett-Packard Development Company, L.P.")
-            .license_type(gtk4::License::MitX11)
-            .build();
-        about_dialog.connect_close_request(glib::clone!(@strong sender => move |_| {
-            send!(sender, AppMsg::ShowAbout(false));
-            gtk4::Inhibit(true)
-        }));
-
         let mut buttons = Vec::new();
 
         for (x, y, right, id) in BUTTONS {
@@ -595,8 +575,15 @@ impl Widgets<AppModel, ()> for AppWidgets {
         let device_group = RelmActionGroup::<DeviceActionGroup>::new();
 
         let about_action: RelmAction<AboutAction> =
-            RelmAction::new_stateless(glib::clone!(@strong sender => move |_| {
-                send!(sender, AppMsg::ShowAbout(true));
+            RelmAction::new_stateless(glib::clone!(@strong sender, @weak main_window => move |_| {
+                gtk4::AboutDialog::builder()
+                    .transient_for(&main_window)
+                    .modal(true)
+                    .version(env!("CARGO_PKG_VERSION"))
+                    .logo_icon_name("input-mouse-symbolic") // TODO
+                    .copyright("Copyright 2022 Hewlett-Packard Development Company, L.P.")
+                    .license_type(gtk4::License::MitX11)
+                    .build().show()
             }));
         app_group.add_action(about_action);
 
@@ -621,8 +608,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 
     fn post_view() {
-        self.about_dialog.set_visible(model.show_about);
-
         if model.selected_device.is_some() {
             self.stack.set_visible_child(&self.device_page);
             main_window.insert_action_group("device", Some(&self.device_actions));
