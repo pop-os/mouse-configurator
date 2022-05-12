@@ -433,8 +433,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             set_vexpand: false,
                             set_halign: gtk4::Align::Center,
                             append = &gtk4::Overlay {
-                                set_child = Some(&gtk4::Picture) {
-                                    set_pixbuf: Some(&gdk_pixbuf::Pixbuf::from_resource_at_scale("/org/pop-os/hp-mouse-configurator/mouse-dark.svg", IMAGE_WIDTH, -1, true).unwrap()), // XXX light
+                                set_child: mouse_picture = Some(&gtk4::Picture) {
                                     set_can_shrink: false,
                                 },
                                 add_overlay: buttons_widget = &ButtonsWidget {
@@ -517,10 +516,36 @@ impl Widgets<AppModel, ()> for AppWidgets {
         buttons: Vec<(Option<HardwareButton>, gtk4::Button)>,
         about_dialog: gtk4::AboutDialog,
         first_view_run: bool,
+        desktop_settings: gio::Settings,
     }
 
     fn post_init() {
         let first_view_run = true;
+
+        // Detect dark/light theme
+        fn update_theme(desktop_settings: &gio::Settings, mouse_picture: &gtk4::Picture) {
+            let resource = if desktop_settings
+                .string("gtk-theme")
+                .as_str()
+                .contains("dark")
+            {
+                "/org/pop-os/hp-mouse-configurator/mouse-dark.svg"
+            } else {
+                "/org/pop-os/hp-mouse-configurator/mouse-light.svg"
+            };
+            mouse_picture.set_pixbuf(Some(
+                &gdk_pixbuf::Pixbuf::from_resource_at_scale(resource, IMAGE_WIDTH, -1, true)
+                    .unwrap(),
+            ));
+        }
+        let desktop_settings = gio::Settings::new("org.gnome.desktop.interface");
+        desktop_settings.connect_changed(
+            Some("gtk-theme"),
+            glib::clone!(@strong mouse_picture => move |desktop_settings, _| {
+                update_theme(desktop_settings, &mouse_picture);
+            }),
+        );
+        update_theme(&desktop_settings, &mouse_picture);
 
         let about_dialog = gtk4::AboutDialog::builder()
             .transient_for(&main_window)
