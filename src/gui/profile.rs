@@ -6,7 +6,7 @@ use super::{
     worker::{DeviceId, WorkerModel, WorkerMsg},
     AppModel,
 };
-use hp_mouse_configurator::Button;
+use hp_mouse_configurator::{Button, PressType};
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(untagged)]
@@ -148,7 +148,7 @@ pub(super) fn apply_profile_diff(
                     } // Shouldn't occur
                     None => &[] as &[_],
                 };
-                let button = Button::new(i as u8, 0, 0, binding); // XXX
+                let button = Button::new(i as u8, 0, PressType::Normal, binding); // XXX
                 send!(worker, WorkerMsg::SetBinding(device_id.clone(), button));
             }
         }

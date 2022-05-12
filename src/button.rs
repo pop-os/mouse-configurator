@@ -384,16 +384,39 @@ pub fn decode_action(action: &[u8]) -> Result<Vec<Op>, String> {
     Ok(ops)
 }
 
+#[derive(Debug, Clone, Copy)]
+#[repr(u8)]
+pub enum PressType {
+    Normal = 0,
+    Long = 1,
+    Double = 2,
+    Down = 3,
+    Up = 4,
+}
+
+impl PressType {
+    fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::Normal),
+            1 => Some(Self::Long),
+            2 => Some(Self::Double),
+            3 => Some(Self::Down),
+            4 => Some(Self::Up),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Button {
     pub id: u8,
     pub host_id: u8,
-    pub press_type: u8,
+    pub press_type: PressType,
     pub(crate) action: Vec<u8>,
 }
 
 impl Button {
-    pub fn new(id: u8, host_id: u8, press_type: u8, action: &[Op]) -> Self {
+    pub fn new(id: u8, host_id: u8, press_type: PressType, action: &[Op]) -> Self {
         Self {
             id,
             host_id,
@@ -412,7 +435,7 @@ impl Button {
         let button = Self {
             id: data[0],
             host_id: data[1],
-            press_type: data[2],
+            press_type: PressType::from_u8(data[2])?,
             action: data.get(4..4 + size)?.to_vec(),
         };
         Some((button, 4 + size))
@@ -421,7 +444,7 @@ impl Button {
     pub fn encode(&self, data: &mut Vec<u8>) {
         data.push(self.id);
         data.push(self.host_id);
-        data.push(self.press_type);
+        data.push(self.press_type as u8);
         data.push(self.action.len() as u8);
         data.extend_from_slice(&self.action);
     }

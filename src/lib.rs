@@ -6,7 +6,7 @@ use std::{
 };
 
 pub mod button;
-pub use button::{Button, Op, Value};
+pub use button::{Button, Op, PressType, Value};
 mod enumerate;
 pub use enumerate::{enumerate, monitor, DeviceInfo};
 mod event;
@@ -123,8 +123,9 @@ impl HpMouse {
 
     pub fn reset(&self) -> io::Result<()> {
         // TODO: Other devices may have different number of buttons?
+        // TODO: Press types
         for id in 0..7 {
-            let button = Button::new(id, 1, 0, &[]);
+            let button = Button::new(id, 1, PressType::Normal, &[]);
             self.set_button(button, false)?;
         }
         self.set_left_handed(false)?;
