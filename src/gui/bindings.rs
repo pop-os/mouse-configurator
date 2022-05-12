@@ -1,11 +1,10 @@
 // TODO custom bindings
 // - Need way to get label, binding, from json representation
 
-#![allow(overflowing_literals)]
-
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
+use crate::keycode::*;
 use hp_mouse_configurator::{Op, Value::*};
 
 // TODO better naming? Important if serialized in json.
@@ -144,7 +143,7 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                     // XXX
                     id: SwitchApp,
                     label: "Switch App",
-                    binding: vec![Op::key(true, vec![Const(0), Const(0x2B)])], // super + tab
+                    binding: vec![Op::key(true, vec![Const(0), Const(KEY_Tab)])], // super + tab
                 },
             ],
         },
@@ -154,32 +153,32 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                 Entry {
                     id: VolumeDown,
                     label: "Volume Down",
-                    binding: vec![Op::media(true, vec![Const(0xEA)])],
+                    binding: vec![Op::media(true, vec![Const(MEDIA_VolumeDown)])],
                 },
                 Entry {
                     id: VolumeUp,
                     label: "Volume Up",
-                    binding: vec![Op::media(true, vec![Const(0xE9)])],
+                    binding: vec![Op::media(true, vec![Const(MEDIA_VolumeUp)])],
                 },
                 Entry {
                     id: NextTrack,
                     label: "Next Track",
-                    binding: vec![Op::media(true, vec![Const(0xB5)])],
+                    binding: vec![Op::media(true, vec![Const(MEDIA_NextSong)])],
                 },
                 Entry {
                     id: PreviousTrack,
                     label: "Previous Track",
-                    binding: vec![Op::media(true, vec![Const(0xB6)])],
+                    binding: vec![Op::media(true, vec![Const(MEDIA_PreviousSong)])],
                 },
                 Entry {
                     id: PlayPause,
                     label: "Play / Pause",
-                    binding: vec![Op::media(true, vec![Const(0xCD)])],
+                    binding: vec![Op::media(true, vec![Const(MEDIA_PlayPause)])],
                 },
                 Entry {
                     id: Mute,
                     label: "Mute",
-                    binding: vec![Op::media(true, vec![Const(0xE2)])],
+                    binding: vec![Op::media(true, vec![Const(MEDIA_Mute)])],
                 },
             ],
         },

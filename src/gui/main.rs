@@ -15,6 +15,7 @@ mod device_monitor_process;
 use device_monitor_process::DeviceMonitorProcess;
 mod dialog;
 use dialog::{DialogModel, DialogMsg};
+mod keycode;
 mod profile;
 use profile::{apply_profile_diff, load_config, save_config, Binding, MouseConfig, MouseState};
 mod swap_button_dialog;
