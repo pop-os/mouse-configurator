@@ -517,6 +517,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
         about_dialog: gtk4::AboutDialog,
         first_view_run: bool,
         desktop_settings: gio::Settings,
+        device_actions: gio::SimpleActionGroup
     }
 
     fn post_init() {
@@ -595,7 +596,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
         let app_actions = app_group.into_action_group();
         let device_actions = device_group.into_action_group();
         main_window.insert_action_group("app", Some(&app_actions));
-        main_window.insert_action_group("device", Some(&device_actions));
 
         send!(sender, AppMsg::SetDeviceMonitor);
 
@@ -612,10 +612,13 @@ impl Widgets<AppModel, ()> for AppWidgets {
 
         if model.selected_device.is_some() {
             self.stack.set_visible_child(&self.device_page);
+            main_window.insert_action_group("device", Some(&self.device_actions));
         } else if !model.devices.is_empty() {
             self.stack.set_visible_child(&self.device_list_page);
+            main_window.insert_action_group("device", None::<&gio::ActionGroup>);
         } else {
             self.stack.set_visible_child(&self.no_device_page);
+            main_window.insert_action_group("device", None::<&gio::ActionGroup>);
         }
 
         if self.first_view_run || model.device_list_changed {
