@@ -615,18 +615,9 @@ fn main() {
         return;
     }
 
-    let device_monitor = device_monitor_process::DeviceMonitorProcess::new().unwrap();
-
     gio::resources_register_include!("compiled.gresource").unwrap();
 
     gtk4::init().unwrap();
-
-    // TODO
-    glib::set_prgname(Some("com.system76.mouseconfigurator"));
-    glib::set_application_name("Mouse Configurator");
-    let app = gtk4::Application::builder()
-        .application_id("com.system76.mouseconfigurator")
-        .build();
 
     let provider = gtk4::CssProvider::new();
     provider.load_from_data(
@@ -643,13 +634,26 @@ fn main() {
         gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
 
+    // TODO
+    glib::set_prgname(Some("com.system76.mouseconfigurator"));
+    glib::set_application_name("Mouse Configurator");
+    let app = gtk4::Application::builder()
+        .application_id("com.system76.mouseconfigurator")
+        .build();
+    app.register(None::<&gio::Cancellable>).unwrap();
+    let device_monitor = if !app.is_remote() {
+        Some(device_monitor_process::DeviceMonitorProcess::new().unwrap())
+    } else {
+        None
+    };
+
     let model = AppModel {
         devices: Vec::new(),
         device_by_id: HashMap::new(),
         selected_device: None,
         bindings_changed: false,
         device_list_changed: false,
-        device_monitor: Some(device_monitor),
+        device_monitor: device_monitor,
         show_about: false,
     };
     let app = RelmApp::with_app(model, app);
