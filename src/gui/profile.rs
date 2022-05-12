@@ -1,5 +1,5 @@
 use relm4::{send, RelmWorker};
-use std::{collections::HashMap, env, path::PathBuf};
+use std::{collections::HashMap, env, fs::File, path::PathBuf};
 
 use super::{
     bindings::{Entry, HardwareButton, PresetBinding},
@@ -38,6 +38,7 @@ pub struct MouseInfo {
     pub serial: String,
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct MouseConfig {
     // Must always be non-empty
     // TODO: Add names to profiles
@@ -184,4 +185,38 @@ fn app_data_dir() -> PathBuf {
         panic!("Failed to create directory `{}`: {}", dir.display(), err);
     }
     dir
+}
+
+// TODO: format? Multiple files?
+// XXX error handling? Don't run `app_data_dir` every save?
+pub fn load_config() -> Vec<MouseConfig> {
+    let mut path = app_data_dir();
+    path.push("config.json");
+
+    let file = match File::open(&path) {
+        Ok(file) => file,
+        Err(_) => {
+            return Vec::new();
+        }
+    };
+
+    match serde_json::from_reader(file) {
+        Ok(config) => config,
+        Err(err) => {
+            eprintln!("Failed to load config: {}", err);
+            return Vec::new();
+        }
+    }
+}
+
+// TODO: atomic replace
+// TODO: don't collect? `SeqIteratorVisitor`
+pub fn save_config<'a, T: Iterator<Item = &'a MouseConfig>>(config: T) {
+    let mut path = app_data_dir();
+    path.push("config.json");
+
+    let config: Vec<_> = config.collect();
+
+    let file = File::create(&path).unwrap();
+    serde_json::to_writer(file, &config).unwrap();
 }

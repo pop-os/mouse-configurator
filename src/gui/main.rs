@@ -16,7 +16,7 @@ use device_monitor_process::DeviceMonitorProcess;
 mod dialog;
 use dialog::{DialogModel, DialogMsg};
 mod profile;
-use profile::{apply_profile_diff, Binding, MouseConfig, MouseState};
+use profile::{apply_profile_diff, load_config, save_config, Binding, MouseConfig, MouseState};
 mod swap_button_dialog;
 use swap_button_dialog::{SwapButtonDialogModel, SwapButtonDialogMsg};
 mod worker;
@@ -74,6 +74,27 @@ struct AppModel {
 }
 
 impl AppModel {
+    fn new(device_monitor: Option<DeviceMonitorProcess>) -> Self {
+        let devices: Vec<_> = load_config()
+            .into_iter()
+            .map(|config| Device {
+                id: None,
+                state: MouseState::default(),
+                config,
+            })
+            .collect();
+        let selected_device = if devices.len() == 1 { Some(0) } else { None };
+        AppModel {
+            devices,
+            device_by_id: HashMap::new(),
+            selected_device,
+            bindings_changed: false,
+            device_list_changed: false,
+            device_monitor,
+            show_about: false,
+        }
+    }
+
     fn device(&self) -> Option<&Device> {
         Some(&self.devices[self.selected_device?])
     }
@@ -157,6 +178,7 @@ enum AppMsg {
     Reset,
     ShowAbout(bool),
     SelectDevice(Option<usize>),
+    SaveConfig,
 }
 
 impl Model for AppModel {
@@ -282,6 +304,9 @@ impl AppUpdate for AppModel {
                     self.selected_device = idx.filter(|idx| *idx < self.devices.len());
                     self.bindings_changed = true;
                 }
+            }
+            AppMsg::SaveConfig => {
+                save_config(self.devices.iter().map(|x| &x.config));
             }
         }
         true
@@ -467,6 +492,10 @@ impl Widgets<AppModel, ()> for AppWidgets {
                         }
                     }
                 }
+            },
+            connect_close_request(sender) => move |_| {
+                send!(sender, AppMsg::SaveConfig);
+                gtk4::Inhibit(false)
             }
         }
     }
@@ -486,9 +515,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
     additional_fields! {
         buttons: Vec<(Option<HardwareButton>, gtk4::Button)>,
         about_dialog: gtk4::AboutDialog,
+        first_view_run: bool,
     }
 
     fn post_init() {
+        let first_view_run = true;
+
         let about_dialog = gtk4::AboutDialog::builder()
             .transient_for(&main_window)
             .hide_on_close(true)
@@ -540,6 +572,13 @@ impl Widgets<AppModel, ()> for AppWidgets {
         main_window.insert_action_group("device", Some(&device_actions));
 
         send!(sender, AppMsg::SetDeviceMonitor);
+
+        glib::timeout_add_seconds(
+            10,
+            glib::clone!(@strong sender => move || {
+                glib::Continue(sender.send(AppMsg::SaveConfig).is_ok())
+            }),
+        );
     }
 
     fn post_view() {
@@ -553,7 +592,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
             self.stack.set_visible_child(&self.no_device_page);
         }
 
-        if model.device_list_changed {
+        if self.first_view_run || model.device_list_changed {
             // Remove existing rows
             while let Some(row) = self.device_list_page.first_child() {
                 self.device_list_page.remove(&row);
@@ -580,7 +619,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
             }
         }
 
-        if model.bindings_changed {
+        if self.first_view_run || model.bindings_changed {
             let bindings = model.device().map(|x| &x.config.profile().bindings);
             for (id, button) in &self.buttons {
                 if let Some(id) = model.swap_buttons(*id) {
@@ -594,6 +633,8 @@ impl Widgets<AppModel, ()> for AppWidgets {
                 }
             }
         }
+
+        self.first_view_run = false;
     }
 }
 
@@ -647,16 +688,7 @@ fn main() {
         None
     };
 
-    let model = AppModel {
-        devices: Vec::new(),
-        device_by_id: HashMap::new(),
-        selected_device: None,
-        bindings_changed: false,
-        device_list_changed: false,
-        device_monitor: device_monitor,
-        show_about: false,
-    };
-    let app = RelmApp::with_app(model, app);
+    let app = RelmApp::with_app(AppModel::new(device_monitor), app);
     app.run();
 }
 
