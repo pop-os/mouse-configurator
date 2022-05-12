@@ -100,11 +100,12 @@ impl AppModel {
             device.id = device.id.clone();
             self.device_by_id.insert(device_id.clone(), idx);
         } else {
-            let device = Device {
+            let mut device = Device {
                 id: Some(device_id.clone()),
                 state: MouseState::default(),
                 config: MouseConfig::new(serial),
             };
+            device.state.set_connected();
             self.devices.push(device);
             let idx = self.devices.len() - 1;
             self.device_by_id.insert(device_id.clone(), idx);
