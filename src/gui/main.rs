@@ -109,7 +109,13 @@ impl AppModel {
         Some(&mut self.devices[*self.device_by_id.get(id)?])
     }
 
-    fn add_or_update_device(&mut self, device_id: DeviceId, serial: String) {
+    fn add_or_update_device(
+        &mut self,
+        device_id: DeviceId,
+        device: String,
+        serial: String,
+        version: (u16, u16, u16),
+    ) {
         if let Some(idx) = self
             .devices
             .iter()
@@ -120,15 +126,17 @@ impl AppModel {
                 self.device_by_id.remove(&old_id);
             }
             device.state.set_connected();
+            device.state.firmware_version = Some(version);
             device.id = device.id.clone();
             self.device_by_id.insert(device_id.clone(), idx);
         } else {
             let mut device = Device {
                 id: Some(device_id.clone()),
                 state: MouseState::default(),
-                config: MouseConfig::new(serial),
+                config: MouseConfig::new(device, serial),
             };
             device.state.set_connected();
+            device.state.firmware_version = Some(version);
             self.devices.push(device);
             let idx = self.devices.len() - 1;
             self.device_by_id.insert(device_id.clone(), idx);
@@ -240,8 +248,12 @@ impl AppUpdate for AppModel {
                         device.state.set_bindings_from_buttons(host_id, &buttons);
                     }
                 }
-                Event::Firmware { serial, .. } => {
-                    self.add_or_update_device(device_id, serial);
+                Event::Firmware {
+                    device,
+                    serial,
+                    version,
+                } => {
+                    self.add_or_update_device(device_id, device, serial, version);
                 }
                 _ => {}
             },
