@@ -624,6 +624,9 @@ fn main() {
     // TODO
     glib::set_prgname(Some("com.system76.mouseconfigurator"));
     glib::set_application_name("Mouse Configurator");
+    let app = gtk4::Application::builder()
+        .application_id("com.system76.mouseconfigurator")
+        .build();
 
     let provider = gtk4::CssProvider::new();
     provider.load_from_data(
@@ -649,7 +652,7 @@ fn main() {
         device_monitor: Some(device_monitor),
         show_about: false,
     };
-    let app = RelmApp::new(model);
+    let app = RelmApp::with_app(model, app);
     app.run();
 }
 
