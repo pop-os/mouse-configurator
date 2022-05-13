@@ -71,6 +71,7 @@ struct AppModel {
     selected_device: Option<usize>,
     bindings_changed: bool,
     device_list_changed: bool,
+    show_about_mouse: bool,
     device_monitor: Option<DeviceMonitorProcess>,
 }
 
@@ -91,6 +92,7 @@ impl AppModel {
             selected_device,
             bindings_changed: false,
             device_list_changed: false,
+            show_about_mouse: false,
             device_monitor,
         }
     }
@@ -186,6 +188,7 @@ enum AppMsg {
     Reset,
     SelectDevice(Option<usize>),
     SaveConfig,
+    ShowAboutMouse,
 }
 
 impl Model for AppModel {
@@ -198,6 +201,7 @@ impl AppUpdate for AppModel {
     fn update(&mut self, msg: AppMsg, components: &AppComponents, _sender: Sender<AppMsg>) -> bool {
         self.bindings_changed = false;
         self.device_list_changed = false;
+        self.show_about_mouse = false;
 
         match msg {
             AppMsg::RenameConfig => {}
@@ -316,6 +320,9 @@ impl AppUpdate for AppModel {
             AppMsg::SaveConfig => {
                 save_config(self.devices.iter().map(|x| &x.config));
             }
+            AppMsg::ShowAboutMouse => {
+                self.show_about_mouse = true;
+            }
         }
         true
     }
@@ -409,15 +416,19 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                     set_label: watch! { &format!("{}%", model.device().and_then(|x| x.state.battery_percent).unwrap_or(0)) }
                                 },
                             },
-                            append = &gtk4::Box {
-                                set_orientation: gtk4::Orientation::Horizontal,
-                                set_spacing: 6,
-                                append = &gtk4::Image {
-                                    set_from_icon_name: Some("help-info-symbolic"),
+                            append = &gtk4::Button {
+                                add_css_class: "flat",
+                                set_child = Some(&gtk4::Box) {
+                                    set_orientation: gtk4::Orientation::Horizontal,
+                                    set_spacing: 6,
+                                    append = &gtk4::Image {
+                                        set_from_icon_name: Some("help-info-symbolic"),
+                                    },
+                                    append = &gtk4::Label {
+                                        set_label: "About This Mouse",
+                                    }
                                 },
-                                append = &gtk4::Label {
-                                    set_label: "About This Mouse",
-                                }
+                                connect_clicked(sender) => move |_| send!(sender, AppMsg::ShowAboutMouse)
                             },
                         },
                         append = &gtk4::Box {
@@ -661,8 +672,111 @@ impl Widgets<AppModel, ()> for AppWidgets {
             }
         }
 
+        if model.show_about_mouse {
+            if let Some(device) = model.device() {
+                show_info_dialog(
+                    &main_window,
+                    &device.config.info.device,
+                    &device.config.info.serial,
+                    device.state.firmware_version,
+                );
+            }
+        }
+
         self.first_view_run = false;
     }
+}
+
+fn device_to_model(device: &str) -> &str {
+    if device == "Brain" {
+        "HP 930 series Creator Wireless Mouse"
+    } else {
+        device
+    }
+}
+
+fn show_info_dialog(
+    main_window: &gtk4::ApplicationWindow,
+    device: &str,
+    serial: &str,
+    firmware_version: Option<(u16, u16, u16)>,
+) {
+    view! {
+        dialog = gtk4::Dialog {
+            set_transient_for: Some(main_window),
+            set_title: Some("About This Mouse"),
+            set_child = Some(&gtk4::ListBox) {
+                set_margin_start: 12,
+                set_margin_end: 12,
+                set_margin_top: 12,
+                set_margin_bottom: 12,
+                add_css_class: "frame",
+                set_header_func: util::header_func,
+                append = &gtk4::ListBoxRow {
+                    set_margin_start: 6,
+                    set_margin_end: 6,
+                    set_margin_top: 6,
+                    set_margin_bottom: 6,
+                    set_selectable: false,
+                    set_activatable: false,
+                    set_child = Some(&gtk4::Box) {
+                        set_spacing: 12,
+                        set_orientation: gtk4::Orientation::Horizontal,
+                        append = &gtk4::Label {
+                            set_label: "Model"
+                        },
+                        append = &gtk4::Label {
+                            set_label: device_to_model(device),
+                            set_hexpand: true,
+                            set_halign: gtk4::Align::End,
+                        }
+                    }
+                },
+                append = &gtk4::ListBoxRow {
+                    set_visible: firmware_version.is_some(),
+                    set_margin_start: 6,
+                    set_margin_end: 6,
+                    set_margin_top: 6,
+                    set_margin_bottom: 6,
+                    set_selectable: false,
+                    set_activatable: false,
+                    set_child = Some(&gtk4::Box) {
+                        set_spacing: 12,
+                        set_orientation: gtk4::Orientation::Horizontal,
+                        append = &gtk4::Label {
+                            set_label: "Firmware Version"
+                        },
+                        append = &gtk4::Label {
+                            set_label: &firmware_version.map_or_else(String::new, |(a, b, c)| format!("{}.{}.{}", a, b, c)),
+                            set_hexpand: true,
+                            set_halign: gtk4::Align::End,
+                        }
+                    }
+                },
+                append = &gtk4::ListBoxRow {
+                    set_margin_start: 6,
+                    set_margin_end: 6,
+                    set_margin_top: 6,
+                    set_margin_bottom: 6,
+                    set_selectable: false,
+                    set_activatable: false,
+                    set_child = Some(&gtk4::Box) {
+                        set_spacing: 12,
+                        set_orientation: gtk4::Orientation::Horizontal,
+                        append = &gtk4::Label {
+                            set_label: "Serial Number"
+                        },
+                        append = &gtk4::Label {
+                            set_label: serial,
+                            set_hexpand: true,
+                            set_halign: gtk4::Align::End,
+                        }
+                    }
+                }
+            }
+        }
+    }
+    dialog.show();
 }
 
 relm4::new_action_group!(AppActionGroup, "app");
