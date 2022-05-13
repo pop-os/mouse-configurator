@@ -310,6 +310,8 @@ impl AppUpdate for AppModel {
                         device.apply_profile_diff(device_id.clone(), &components.worker);
                         device.apply_dpi_diff(device_id, &components.worker);
                     }
+
+                    self.bindings_changed = true;
                 }
             }
             AppMsg::SelectDevice(idx) => {
