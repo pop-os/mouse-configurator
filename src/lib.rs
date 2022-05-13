@@ -125,8 +125,10 @@ impl HpMouse {
         // TODO: Other devices may have different number of buttons?
         // TODO: Press types
         for id in 0..7 {
-            let button = Button::new(id, 1, PressType::Normal, &[]);
-            self.set_button(button, false)?;
+            for host in [1, 2, 3, 255] {
+                let button = Button::new(id, host, PressType::Normal, &[]);
+                self.set_button(button, false)?;
+            }
         }
         self.set_left_handed(false)?;
         Ok(())

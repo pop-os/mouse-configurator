@@ -384,7 +384,7 @@ pub fn decode_action(action: &[u8]) -> Result<Vec<Op>, String> {
     Ok(ops)
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum PressType {
     Normal = 0,
