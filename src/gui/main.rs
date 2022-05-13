@@ -127,7 +127,7 @@ impl AppModel {
             }
             device.state.set_connected();
             device.state.firmware_version = Some(version);
-            device.id = device.id.clone();
+            device.id = Some(device_id.clone());
             self.device_by_id.insert(device_id.clone(), idx);
         } else {
             let mut device = Device {
@@ -137,6 +137,7 @@ impl AppModel {
             };
             device.state.set_connected();
             device.state.firmware_version = Some(version);
+            device.id = Some(device_id.clone());
             self.devices.push(device);
             let idx = self.devices.len() - 1;
             self.device_by_id.insert(device_id.clone(), idx);
