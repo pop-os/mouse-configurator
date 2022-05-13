@@ -143,7 +143,7 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                     // XXX
                     id: SwitchApp,
                     label: "Switch App",
-                    binding: vec![Op::key(true, vec![Const(0), Const(KEY_Tab)])], // super + tab
+                    binding: vec![Op::key(true, vec![Const(8), Const(KEY_Tab)])], // super + tab
                 },
             ],
         },

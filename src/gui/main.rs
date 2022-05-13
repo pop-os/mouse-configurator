@@ -283,7 +283,11 @@ impl AppUpdate for AppModel {
             }
             AppMsg::SetBinding(button, binding) => {
                 if let Some(device) = self.device_mut() {
-                    device.config.profile_mut().bindings.insert(button, binding);
+                    if binding == Binding::Preset(button.def_binding().id) {
+                        device.config.profile_mut().bindings.remove(&button);
+                    } else {
+                        device.config.profile_mut().bindings.insert(button, binding);
+                    }
                     if let Some(device_id) = device.id.clone() {
                         device.apply_profile_diff(device_id, &components.worker);
                     }

@@ -151,8 +151,9 @@ pub(super) fn apply_profile_diff(
                 let binding = match config_binding {
                     Some(Binding::Preset(preset)) => &preset.entry().binding,
                     Some(Binding::Unknown) => {
+                        // Shouldn't occur
                         continue;
-                    } // Shouldn't occur
+                    }
                     None => &[] as &[_],
                 };
                 let button = Button::new(i as u8, 0, PressType::Normal, binding); // XXX
