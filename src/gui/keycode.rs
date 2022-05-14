@@ -2,6 +2,11 @@
 
 // Matches /sys/kernel/debug/hid/*/rdesc
 
+pub const MOD_Ctrl: i8 = 1 << 0;
+pub const MOD_Shift: i8 = 1 << 1;
+pub const MOD_Alt: i8 = 1 << 2;
+pub const MOD_Super: i8 = 1 << 3;
+
 pub const KEY_A: i8 = 0x04;
 pub const KEY_B: i8 = 0x05;
 pub const KEY_C: i8 = 0x06;

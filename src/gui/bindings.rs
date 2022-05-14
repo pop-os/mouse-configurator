@@ -62,6 +62,7 @@ pub struct Entry {
     pub id: PresetBinding,
     pub label: &'static str,
     pub binding: Vec<Op>,
+    pub keybind: Option<&'static str>,
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
@@ -75,12 +76,20 @@ pub enum PresetBinding {
     Back,
     Forward,
     SwitchApp,
+    Disabled,
     VolumeDown,
     VolumeUp,
     NextTrack,
     PreviousTrack,
     PlayPause,
     Mute,
+    Copy,
+    Cut,
+    Paste,
+    Undo,
+    SelectAll,
+    Redo,
+    Find,
 }
 
 impl PresetBinding {
@@ -108,42 +117,56 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                     id: RightClick,
                     label: "Right Click",
                     binding: vec![Op::mouse(true, 2, 0, 0, 0, 0)],
+                    keybind: None,
                 },
                 Entry {
                     id: LeftClick,
                     label: "Left Click",
                     binding: vec![Op::mouse(true, 1, 0, 0, 0, 0)],
+                    keybind: None,
                 },
                 Entry {
                     id: MiddleClick,
                     label: "Middle Click",
                     binding: vec![Op::mouse(true, 4, 0, 0, 0, 0)],
+                    keybind: None,
                 },
                 Entry {
                     id: ScrollLeft,
                     label: "Scroll Left",
                     binding: vec![Op::mouse(false, 0, 0, 0, 0, -1)],
+                    keybind: None,
                 },
                 Entry {
                     id: ScrollRight,
                     label: "Scroll Right",
                     binding: vec![Op::mouse(false, 0, 0, 0, 0, 1)],
+                    keybind: None,
                 },
                 Entry {
                     id: Back,
                     label: "Back",
                     binding: vec![Op::mouse(true, 8, 0, 0, 0, 0)],
+                    keybind: None,
                 },
                 Entry {
                     id: Forward,
                     label: "Forward",
                     binding: vec![Op::mouse(true, 16, 0, 0, 0, 0)],
+                    keybind: None,
                 },
                 Entry {
                     // XXX
                     id: SwitchApp,
                     label: "Switch App",
-                    binding: vec![Op::key(true, vec![Const(8), Const(KEY_Tab)])], // super + tab
+                    binding: vec![Op::key(true, vec![Const(MOD_Super), Const(KEY_Tab)])],
+                    keybind: None,
+                },
+                Entry {
+                    id: Disabled,
+                    label: "Disabled",
+                    binding: vec![Op::Kill],
+                    keybind: None,
                 },
             ],
         },
@@ -154,31 +177,84 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                     id: VolumeDown,
                     label: "Volume Down",
                     binding: vec![Op::media(true, vec![Const(MEDIA_VolumeDown)])],
+                    keybind: None,
                 },
                 Entry {
                     id: VolumeUp,
                     label: "Volume Up",
                     binding: vec![Op::media(true, vec![Const(MEDIA_VolumeUp)])],
+                    keybind: None,
                 },
                 Entry {
                     id: NextTrack,
                     label: "Next Track",
                     binding: vec![Op::media(true, vec![Const(MEDIA_NextSong)])],
+                    keybind: None,
                 },
                 Entry {
                     id: PreviousTrack,
                     label: "Previous Track",
                     binding: vec![Op::media(true, vec![Const(MEDIA_PreviousSong)])],
+                    keybind: None,
                 },
                 Entry {
                     id: PlayPause,
                     label: "Play / Pause",
                     binding: vec![Op::media(true, vec![Const(MEDIA_PlayPause)])],
+                    keybind: None,
                 },
                 Entry {
                     id: Mute,
                     label: "Mute",
                     binding: vec![Op::media(true, vec![Const(MEDIA_Mute)])],
+                    keybind: None,
+                },
+            ],
+        },
+        Category {
+            label: "Edit Features",
+            entries: vec![
+                Entry {
+                    id: Copy,
+                    label: "Copy",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_C)])],
+                    keybind: Some("Ctrl+C"),
+                },
+                Entry {
+                    id: Cut,
+                    label: "Cut",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_X)])],
+                    keybind: Some("Ctrl+X"),
+                },
+                Entry {
+                    id: Paste,
+                    label: "Paste",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_V)])],
+                    keybind: Some("Ctrl+V"),
+                },
+                Entry {
+                    id: Undo,
+                    label: "Undo",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_Z)])],
+                    keybind: Some("Ctrl+Z"),
+                },
+                Entry {
+                    id: Redo,
+                    label: "Redo",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_Y)])],
+                    keybind: Some("Ctrl+Y"),
+                },
+                Entry {
+                    id: SelectAll,
+                    label: "Select All",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_A)])],
+                    keybind: Some("Ctrl+A"),
+                },
+                Entry {
+                    id: Find,
+                    label: "Find",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_F)])],
+                    keybind: Some("Ctrl+F"),
                 },
             ],
         },

@@ -110,17 +110,28 @@ impl Widgets<DialogModel, super::AppModel> for DialogWidgets {
                 view! {
                     row = gtk4::ListBoxRow {
                         set_selectable: false,
-                        set_child = Some(&gtk4::Box) {
+                        set_child: hbox = Some(&gtk4::Box) {
                             set_margin_top: 6,
                             set_margin_bottom: 6,
                             set_margin_start: 6,
                             set_margin_end: 6,
+                            set_spacing: 12,
                             set_orientation: gtk4::Orientation::Horizontal,
                             append = &gtk4::Label {
                                 set_label: entry.label, // TODO Translate?
                             }
                         }
                     }
+                }
+                if let Some(keybind) = entry.keybind {
+                    view! {
+                        keybind_label = gtk4::Label {
+                            set_label: keybind,
+                            set_hexpand: true,
+                            set_halign: gtk4::Align::End,
+                        }
+                    }
+                    hbox.append(&keybind_label);
                 }
                 list_box.append(&row);
                 rows.insert(row, entry);

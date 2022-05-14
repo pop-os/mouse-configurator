@@ -377,7 +377,7 @@ pub fn decode_action(action: &[u8]) -> Result<Vec<Op>, String> {
         }
     }
 
-    if ops.last() == Some(&Op::Kill) {
+    if ops.len() > 1 && ops.last() == Some(&Op::Kill) {
         ops.pop();
     }
 
