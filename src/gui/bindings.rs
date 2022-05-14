@@ -90,6 +90,14 @@ pub enum PresetBinding {
     SelectAll,
     Redo,
     Find,
+    Refresh,
+    OpenTab,
+    CloseTab,
+    NewWindow,
+    Home,
+    SaveBookmark,
+    ZoomIn,
+    ZoomOut,
 }
 
 impl PresetBinding {
@@ -255,6 +263,62 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                     label: "Find",
                     binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_F)])],
                     keybind: Some("Ctrl+F"),
+                },
+            ],
+        },
+        Category {
+            label: "App/Browser Controls",
+            entries: vec![
+                Entry {
+                    id: Refresh,
+                    label: "Refresh",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_R)])],
+                    keybind: Some("Ctrl+R"),
+                },
+                Entry {
+                    id: OpenTab,
+                    label: "Open New Tab/Page",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_T)])],
+                    keybind: Some("Ctrl+T"),
+                },
+                Entry {
+                    id: CloseTab,
+                    label: "Close Current Tab/Page",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_W)])],
+                    keybind: Some("Ctrl+W"),
+                },
+                Entry {
+                    id: NewWindow,
+                    label: "New Window",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_N)])],
+                    keybind: Some("Ctrl+N"),
+                },
+                Entry {
+                    id: Home,
+                    label: "New Window",
+                    binding: vec![Op::key(true, vec![Const(MOD_Alt), Const(KEY_Home)])],
+                    keybind: Some("Alt+Home"),
+                },
+                Entry {
+                    id: SaveBookmark,
+                    label: "Save Page as Bookmark",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_D)])],
+                    keybind: Some("Ctrl+D"),
+                },
+                Entry {
+                    id: ZoomIn,
+                    label: "Zoom In",
+                    binding: vec![Op::key(
+                        true,
+                        vec![Const(MOD_Ctrl | MOD_Shift), Const(KEY_Equal)],
+                    )],
+                    keybind: Some("Ctrl +"),
+                },
+                Entry {
+                    id: ZoomIn,
+                    label: "Zoom Out",
+                    binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_Minus)])],
+                    keybind: Some("Ctrl -"),
                 },
             ],
         },
