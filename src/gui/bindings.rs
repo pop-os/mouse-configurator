@@ -46,7 +46,7 @@ impl HardwareButton {
             Self::LeftTop => PresetBinding::Forward,
             Self::ScrollLeft => PresetBinding::ScrollLeft, // XXX not same as default?
             Self::ScrollRight => PresetBinding::ScrollRight,
-            Self::LeftCenter => PresetBinding::SwitchApp,
+            Self::LeftCenter => PresetBinding::SwitchApplications,
         }
         .entry()
     }
@@ -75,7 +75,7 @@ pub enum PresetBinding {
     ScrollRight,
     Back,
     Forward,
-    SwitchApp,
+    SwitchApplications,
     Disabled,
     VolumeDown,
     VolumeUp,
@@ -98,6 +98,21 @@ pub enum PresetBinding {
     SaveBookmark,
     ZoomIn,
     ZoomOut,
+    MoveToWorkspaceBelow,
+    MoveToWorkspaceAbove,
+    WorkspacesOverview,
+    ToggleFullscreen,
+    MaximizeWindow,
+    MinimizeWindow,
+    Restart,
+    LogOut,
+    LockScreen,
+    Super,
+    PrintScreen,
+    ShowApplications,
+    ShowLauncher,
+    BrightnessUp,
+    BrightnessDown,
 }
 
 impl PresetBinding {
@@ -161,13 +176,6 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                     id: Forward,
                     label: "Forward",
                     binding: vec![Op::mouse(true, 16, 0, 0, 0, 0)],
-                    keybind: None,
-                },
-                Entry {
-                    // XXX
-                    id: SwitchApp,
-                    label: "Switch App",
-                    binding: vec![Op::key(true, vec![Const(MOD_Super), Const(KEY_Tab)])],
                     keybind: None,
                 },
                 Entry {
@@ -319,6 +327,94 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                     label: "Zoom Out",
                     binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_Minus)])],
                     keybind: Some("Ctrl -"),
+                },
+            ],
+        },
+        Category {
+            label: "System and Window Controls",
+            entries: vec![
+                Entry {
+                    id: MoveToWorkspaceBelow,
+                    label: "Move To Workspace Below",
+                    binding: vec![Op::key(
+                        true,
+                        vec![Const(MOD_Ctrl | MOD_Super), Const(KEY_Up)],
+                    )],
+                    keybind: Some("Ctrl+Super+Up"),
+                },
+                Entry {
+                    id: MoveToWorkspaceAbove,
+                    label: "Move To Workspace Below",
+                    binding: vec![Op::key(
+                        true,
+                        vec![Const(MOD_Ctrl | MOD_Super), Const(KEY_Up)],
+                    )],
+                    keybind: Some("Ctrl+Super+Up"),
+                },
+                Entry {
+                    id: WorkspacesOverview,
+                    label: "Workspaces Overview",
+                    binding: vec![Op::key(true, vec![Const(MOD_Super), Const(KEY_D)])],
+                    keybind: Some("Ctrl+D"),
+                },
+                // TODO toggle fullscreen, maximize window, minimize window
+                Entry {
+                    id: Restart,
+                    label: "Restart",
+                    binding: vec![Op::media(true, vec![Const(MEDIA_Restart)])],
+                    keybind: None,
+                },
+                Entry {
+                    id: LogOut,
+                    label: "Log Out",
+                    binding: vec![Op::key(
+                        true,
+                        vec![Const(MOD_Ctrl | MOD_Alt), Const(KEY_Delete)],
+                    )],
+                    keybind: Some("Ctrl+Alt+Delete"),
+                },
+                Entry {
+                    id: LockScreen,
+                    label: "Lock Screen",
+                    binding: vec![Op::key(true, vec![Const(MOD_Super), Const(KEY_Esc)])],
+                    keybind: Some("Super+Escape"),
+                },
+                // TODO super
+                Entry {
+                    id: PrintScreen,
+                    label: "Print Screen",
+                    binding: vec![Op::key(true, vec![Const(0), Const(KEY_SysRq)])],
+                    keybind: None,
+                },
+                Entry {
+                    id: ShowApplications,
+                    label: "Show All Applications",
+                    binding: vec![Op::key(true, vec![Const(MOD_Super), Const(KEY_A)])],
+                    keybind: Some("Super+A"),
+                },
+                Entry {
+                    id: SwitchApplications,
+                    label: "Switch Applications",
+                    binding: vec![Op::key(true, vec![Const(MOD_Super), Const(KEY_Tab)])],
+                    keybind: Some("Super+Tab"),
+                },
+                Entry {
+                    id: ShowLauncher,
+                    label: "Open Launcher",
+                    binding: vec![Op::key(true, vec![Const(MOD_Super), Const(KEY_Slash)])],
+                    keybind: Some("Super+/"),
+                },
+                Entry {
+                    id: BrightnessUp,
+                    label: "Increase Display Brightness",
+                    binding: vec![Op::media(true, vec![Const(MEDIA_BrightnessUp)])],
+                    keybind: None,
+                },
+                Entry {
+                    id: BrightnessDown,
+                    label: "Decrease Display Brightness",
+                    binding: vec![Op::media(true, vec![Const(MEDIA_BrightnessDown)])],
+                    keybind: None,
                 },
             ],
         },

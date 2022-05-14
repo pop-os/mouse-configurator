@@ -53,6 +53,8 @@ pub const KEY_Equal: i8 = 0x2E;
 pub const KEY_LeftBrace: i8 = 0x2F;
 pub const KEY_RightBrace: i8 = 0x30;
 // ...
+pub const KEY_Slash: i8 = 0x38;
+// ...
 pub const KEY_F1: i8 = 0x3A;
 pub const KEY_F2: i8 = 0x3B;
 pub const KEY_F3: i8 = 0x3C;
@@ -65,15 +67,24 @@ pub const KEY_F9: i8 = 0x42;
 pub const KEY_F10: i8 = 0x43;
 pub const KEY_F11: i8 = 0x44;
 pub const KEY_F12: i8 = 0x45;
+pub const KEY_SysRq: i8 = 0x46;
 // ...
 pub const KEY_Home: i8 = 0x4A;
-// ...
+pub const KEY_PageUp: i8 = 0x4B;
+pub const KEY_Delete: i8 = 0x4C;
+pub const KEY_End: i8 = 0x4D;
+pub const KEY_PageDown: i8 = 0x4E;
 pub const KEY_Right: i8 = 0x4F;
 pub const KEY_Left: i8 = 0x50;
 pub const KEY_Down: i8 = 0x51;
 pub const KEY_Up: i8 = 0x52;
 
 // Consumer page
+pub const MEDIA_Restart: i8 = 0x31;
+// ...
+pub const MEDIA_BrightnessUp: i8 = 0x6F;
+pub const MEDIA_BrightnessDown: i8 = 0x70;
+// ...
 pub const MEDIA_Play: i8 = 0xB0;
 pub const MEDIA_Pause: i8 = 0xB1;
 pub const MEDIA_Record: i8 = 0xB2;
