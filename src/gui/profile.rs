@@ -28,6 +28,7 @@ impl Binding {
 
 #[derive(Default, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Profile {
+    pub name: Option<String>,
     pub bindings: HashMap<HardwareButton, Binding>,
     pub left_handed: bool,
 }
@@ -42,7 +43,6 @@ pub struct MouseInfo {
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct MouseConfig {
     // Must always be non-empty
-    // TODO: Add names to profiles
     profiles: Vec<Profile>,
     // Must Always be in range
     profile_num: usize,
@@ -69,6 +69,20 @@ impl MouseConfig {
 
     pub fn profile_mut(&mut self) -> &mut Profile {
         &mut self.profiles[self.profile_num]
+    }
+
+    pub fn profiles(&self) -> &[Profile] {
+        &self.profiles
+    }
+
+    pub fn select_profile(&mut self, profile: usize) {
+        if profile < self.profiles.len() {
+            self.profile_num = profile;
+        }
+    }
+
+    pub fn profile_num(&self) -> usize {
+        self.profile_num
     }
 }
 

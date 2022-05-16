@@ -64,6 +64,7 @@ impl Device {
     }
 }
 
+#[derive(Default)]
 struct AppModel {
     devices: Vec<Device>,
     // Index in devices. Must update on remove.
@@ -71,6 +72,7 @@ struct AppModel {
     selected_device: Option<usize>,
     bindings_changed: bool,
     device_list_changed: bool,
+    profiles_changed: bool,
     show_about_mouse: bool,
     device_monitor: Option<DeviceMonitorProcess>,
 }
@@ -88,12 +90,9 @@ impl AppModel {
         let selected_device = if devices.len() == 1 { Some(0) } else { None };
         AppModel {
             devices,
-            device_by_id: HashMap::new(),
             selected_device,
-            bindings_changed: false,
-            device_list_changed: false,
-            show_about_mouse: false,
             device_monitor,
+            ..Default::default()
         }
     }
 
@@ -190,6 +189,7 @@ enum AppMsg {
     SelectDevice(Option<usize>),
     SaveConfig,
     ShowAboutMouse,
+    SelectProfile(usize),
 }
 
 impl Model for AppModel {
@@ -203,6 +203,7 @@ impl AppUpdate for AppModel {
         self.bindings_changed = false;
         self.device_list_changed = false;
         self.show_about_mouse = false;
+        self.profiles_changed = false;
 
         match msg {
             AppMsg::RenameConfig => {}
@@ -322,6 +323,7 @@ impl AppUpdate for AppModel {
                 if idx != self.selected_device {
                     self.selected_device = idx.filter(|idx| *idx < self.devices.len());
                     self.bindings_changed = true;
+                    self.profiles_changed = true;
                 }
             }
             AppMsg::SaveConfig => {
@@ -329,6 +331,15 @@ impl AppUpdate for AppModel {
             }
             AppMsg::ShowAboutMouse => {
                 self.show_about_mouse = true;
+            }
+            AppMsg::SelectProfile(profile) => {
+                if let Some(device) = self.device_mut() {
+                    if profile != device.config.profile_num() {
+                        device.config.select_profile(profile);
+                        self.profiles_changed = true;
+                        self.bindings_changed = true;
+                    }
+                }
             }
         }
         true
@@ -443,8 +454,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             append = &gtk4::Label {
                                 set_label: "Configuration",
                             },
-                            append = &gtk4::DropDown {
+                            append: profiles_dropdown = &gtk4::DropDown {
                                 set_hexpand: true,
+                                // set_show_arrow: false, XXX requires GTK 4.6?
+                                connect_selected_notify(sender) => move |drop_down| {
+                                    send!(sender, AppMsg::SelectProfile(drop_down.selected() as usize));
+                                }
                             },
                             append = &gtk4::MenuButton {
                                 set_menu_model: Some(&config_menu),
@@ -541,7 +556,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
         buttons: Vec<(Option<HardwareButton>, gtk4::Button)>,
         first_view_run: bool,
         desktop_settings: gio::Settings,
-        device_actions: gio::SimpleActionGroup
+        device_actions: gio::SimpleActionGroup,
     }
 
     fn post_init() {
@@ -664,23 +679,43 @@ impl Widgets<AppModel, ()> for AppWidgets {
             }
         }
 
-        if self.first_view_run || model.bindings_changed {
-            let bindings = model.device().map(|x| &x.config.profile().bindings);
-            for (id, button) in &self.buttons {
-                if let Some(id) = model.swap_buttons(*id) {
-                    button.set_label(
-                        &bindings
-                            .and_then(|x| x.get(&id))
-                            .map_or_else(|| id.def_binding().label.to_string(), |x| x.label()),
-                    );
-                } else {
-                    button.set_label("Left Click");
+        if let Some(device) = model.device() {
+            if self.first_view_run || model.bindings_changed {
+                let bindings = &device.config.profile().bindings;
+                for (id, button) in &self.buttons {
+                    if let Some(id) = model.swap_buttons(*id) {
+                        button.set_label(
+                            &bindings
+                                .get(&id)
+                                .map_or_else(|| id.def_binding().label.to_string(), |x| x.label()),
+                        );
+                    } else {
+                        button.set_label("Left Click");
+                    }
                 }
             }
-        }
 
-        if model.show_about_mouse {
-            if let Some(device) = model.device() {
+            if self.first_view_run || model.profiles_changed {
+                let default_labels = &[
+                    "Configuration One",
+                    "Configuration Two",
+                    "Configuration Three",
+                    "Configuration Four",
+                ];
+                let labels: Vec<_> = device
+                    .config
+                    .profiles()
+                    .iter()
+                    .enumerate()
+                    .map(|(n, profile)| profile.name.as_deref().unwrap_or(default_labels[n]))
+                    .collect();
+                self.profiles_dropdown
+                    .set_model(Some(&gtk4::StringList::new(&labels)));
+                self.profiles_dropdown
+                    .set_selected(device.config.profile_num() as u32);
+            }
+
+            if model.show_about_mouse {
                 show_info_dialog(
                     &main_window,
                     &device.config.info.device,
