@@ -379,7 +379,12 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                     binding: vec![Op::key(true, vec![Const(MOD_Super), Const(KEY_Esc)])],
                     keybind: Some("Super+Escape"),
                 },
-                // TODO super
+                Entry {
+                    id: Super,
+                    label: "Super",
+                    binding: vec![Op::key(true, vec![Const(0), Const(KEY_LeftSuper)])],
+                    keybind: None,
+                },
                 Entry {
                     id: PrintScreen,
                     label: "Print Screen",

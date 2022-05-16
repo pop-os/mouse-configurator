@@ -78,6 +78,15 @@ pub const KEY_Right: i8 = 0x4F;
 pub const KEY_Left: i8 = 0x50;
 pub const KEY_Down: i8 = 0x51;
 pub const KEY_Up: i8 = 0x52;
+// ...
+pub const KEY_LeftCtrl: i8 = 0xE0;
+pub const KEY_LeftShift: i8 = 0xE1;
+pub const KEY_LeftAlt: i8 = 0xE2;
+pub const KEY_LeftSuper: i8 = 0xE3;
+pub const KEY_RightCtrl: i8 = 0xE4;
+pub const KEY_RightShift: i8 = 0xE5;
+pub const KEY_RightAlt: i8 = 0xE6;
+pub const KEY_RighSuper: i8 = 0xE7;
 
 // Consumer page
 pub const MEDIA_Restart: i8 = 0x31;
