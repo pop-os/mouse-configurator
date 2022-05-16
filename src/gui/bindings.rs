@@ -102,8 +102,6 @@ pub enum PresetBinding {
     MoveToWorkspaceAbove,
     WorkspacesOverview,
     ToggleFullscreen,
-    MaximizeWindow,
-    MinimizeWindow,
     Restart,
     LogOut,
     LockScreen,
@@ -357,7 +355,12 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                     binding: vec![Op::key(true, vec![Const(MOD_Super), Const(KEY_D)])],
                     keybind: Some("Ctrl+D"),
                 },
-                // TODO toggle fullscreen, maximize window, minimize window
+                Entry {
+                    id: ToggleFullscreen,
+                    label: "Toggle Fullscreen",
+                    binding: vec![Op::key(true, vec![Const(0), Const(KEY_F11)])],
+                    keybind: Some("F11"),
+                },
                 Entry {
                     id: Restart,
                     label: "Restart",
