@@ -14,6 +14,7 @@ SRC = Cargo.toml Cargo.lock Makefile $(shell find src -type f -wholename '*src/*
 APPID = "com.hp.mouse-configurator"
 BIN=hp-mouse-configurator
 DESKTOP = $(APPID).desktop
+ICON = $(APPID).svg
 
 TARGET = debug
 DEBUG ?= 0
@@ -38,10 +39,12 @@ distclean:
 install: all
 	install -D -m 0755 "target/release/$(BIN)" "$(DESTDIR)$(bindir)/$(BIN)"
 	install -Dm0644 "data/$(DESKTOP)" "$(DESTDIR)$(datadir)/applications/$(DESKTOP)"
+	install -Dm0644 "data/$(ICON)" "$(DESTDIR)$(datadir)/icons/hicolor/scalable/apps/$(ICON)"
 
 uninstall:
 	rm -f "$(DESTDIR)$(bindir)/$(BIN)"
 	rm -f "$(DESTDIR)$(datadir)/applications/$(DESKTOP)"
+	rm -f "$(DESTDIR)$(datadir)/icons/hicolor/scalable/apps/$(ICON)"
 
 update:
 	cargo update
