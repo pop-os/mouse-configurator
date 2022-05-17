@@ -74,6 +74,7 @@ struct AppModel {
     device_list_changed: bool,
     profiles_changed: bool,
     show_about_mouse: bool,
+    rename_config: bool,
     device_monitor: Option<DeviceMonitorProcess>,
 }
 
@@ -178,8 +179,8 @@ enum AppMsg {
     SetDeviceMonitor,
     DeviceAdded(DeviceId),
     DeviceRemoved(DeviceId),
-    #[allow(unused)]
-    RenameConfig,
+    ToggleRenameConfig,
+    RenameConfig(Option<String>),
     Event(DeviceId, Event),
     SetDpi(f64),
     SetBinding(HardwareButton, Binding),
@@ -206,7 +207,15 @@ impl AppUpdate for AppModel {
         self.profiles_changed = false;
 
         match msg {
-            AppMsg::RenameConfig => {}
+            AppMsg::ToggleRenameConfig => {
+                self.rename_config = !self.rename_config;
+            }
+            AppMsg::RenameConfig(name) => {
+                if let Some(device) = self.device_mut() {
+                    device.config.profile_mut().name = name;
+                    self.profiles_changed = true;
+                }
+            }
             AppMsg::SetDeviceMonitor => {
                 if let Some(device_monitor) = self.device_monitor.take() {
                     send!(
@@ -459,13 +468,22 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             append = &gtk4::Label {
                                 set_label: "Configuration",
                             },
-                            append: profiles_dropdown = &gtk4::DropDown {
-                                set_hexpand: true,
-                                // set_show_arrow: false, XXX requires GTK 4.6?
+                            append: profiles_stack = &gtk4::Stack {
+                                add_child: profiles_dropdown = &gtk4::DropDown {
+                                    set_hexpand: true,
+                                    // set_show_arrow: false, XXX requires GTK 4.6?
+                                },
+                                add_child: profiles_entry = &gtk4::Entry {
+                                    connect_activate(sender) => move |_| {
+                                        send!(sender, AppMsg::ToggleRenameConfig);
+                                    }
+                                }
+
                             },
-                            append = &gtk4::MenuButton {
-                                set_menu_model: Some(&config_menu),
-                                set_icon_name: "view-more-symbolic"
+                            append: rename_button = &gtk4::Button {
+                                connect_clicked(sender) => move |_| {
+                                    send!(sender, AppMsg::ToggleRenameConfig);
+                                }
                             }
                         },
                         // One element box to work around weird size allocation behavior
@@ -546,9 +564,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
         menu: {
             "Reset to Default" => ResetAction,
             "About" => AboutAction,
-        },
-        config_menu: {
-            "Rename Configuration" => RenameConfig,
             "Import Configuration" => ImportConfig,
             "Export Configuration" => ExportConfig,
         }
@@ -652,6 +667,33 @@ impl Widgets<AppModel, ()> for AppWidgets {
     fn post_view() {
         if model.selected_device.is_some() {
             self.stack.set_visible_child(&self.device_page);
+            let in_rename_config = self.profiles_stack.visible_child().as_ref()
+                == Some(self.profiles_entry.upcast_ref::<gtk4::Widget>());
+            if model.rename_config {
+                rename_button.set_icon_name("emblem-ok-symbolic");
+                if !in_rename_config {
+                    let text = model
+                        .device()
+                        .and_then(|x| x.config.profile().name.as_deref())
+                        .unwrap_or("");
+                    self.profiles_entry.set_text(text);
+                    self.profiles_stack.set_visible_child(&self.profiles_entry);
+                    self.profiles_entry.grab_focus();
+                }
+            } else {
+                rename_button.set_icon_name("document-edit-symbolic");
+                if in_rename_config {
+                    let text = self.profiles_entry.text();
+                    let name = if text.is_empty() {
+                        None
+                    } else {
+                        Some(text.as_str().to_string())
+                    };
+                    send!(sender, AppMsg::RenameConfig(name));
+                    self.profiles_stack
+                        .set_visible_child(&self.profiles_dropdown);
+                }
+            }
             main_window.insert_action_group("device", Some(&self.device_actions));
         } else if !model.devices.is_empty() {
             self.stack.set_visible_child(&self.device_list_page);
@@ -838,12 +880,9 @@ relm4::new_action_group!(AppActionGroup, "app");
 relm4::new_stateless_action!(AboutAction, AppActionGroup, "about");
 
 relm4::new_action_group!(DeviceActionGroup, "device");
+relm4::new_stateless_action!(ImportConfig, DeviceActionGroup, "import_config");
+relm4::new_stateless_action!(ExportConfig, DeviceActionGroup, "export_config");
 relm4::new_stateless_action!(ResetAction, DeviceActionGroup, "reset_config");
-
-relm4::new_action_group!(ConfigActionGroup, "config");
-relm4::new_stateless_action!(RenameConfig, ConfigActionGroup, "rename_config");
-relm4::new_stateless_action!(ImportConfig, ConfigActionGroup, "import_config");
-relm4::new_stateless_action!(ExportConfig, ConfigActionGroup, "export_config");
 
 fn main() {
     let mut args = env::args().skip(1);
