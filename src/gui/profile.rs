@@ -52,8 +52,9 @@ pub struct MouseConfig {
 impl MouseConfig {
     // XXX Default DPI should depend on device model
     pub fn new(device: String, serial: String) -> Self {
+        let profiles = (0..4).map(|_| Profile::default()).collect();
         Self {
-            profiles: vec![Profile::default()],
+            profiles,
             profile_num: 0,
             info: MouseInfo {
                 device,
@@ -221,13 +222,21 @@ pub fn load_config() -> Vec<MouseConfig> {
         }
     };
 
-    match serde_json::from_reader(file) {
+    let mut config: Vec<MouseConfig> = match serde_json::from_reader(file) {
         Ok(config) => config,
         Err(err) => {
             eprintln!("Failed to load config: {}", err);
             return Vec::new();
         }
+    };
+    // Ensure there are exactly 4 profiles. May change in future.
+    for mouse in &mut config {
+        mouse.profiles.truncate(4);
+        while mouse.profiles.len() < 4 {
+            mouse.profiles.push(Profile::default());
+        }
     }
+    config
 }
 
 // TODO: atomic replace

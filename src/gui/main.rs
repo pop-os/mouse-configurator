@@ -334,8 +334,13 @@ impl AppUpdate for AppModel {
             }
             AppMsg::SelectProfile(profile) => {
                 if let Some(device) = self.device_mut() {
-                    if profile != device.config.profile_num() {
+                    if profile != device.config.profile_num()
+                        && profile < device.config.profiles().len()
+                    {
                         device.config.select_profile(profile);
+                        if let Some(device_id) = device.id.clone() {
+                            device.apply_profile_diff(device_id, &components.worker);
+                        }
                         self.profiles_changed = true;
                         self.bindings_changed = true;
                     }
@@ -457,9 +462,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             append: profiles_dropdown = &gtk4::DropDown {
                                 set_hexpand: true,
                                 // set_show_arrow: false, XXX requires GTK 4.6?
-                                connect_selected_notify(sender) => move |drop_down| {
-                                    send!(sender, AppMsg::SelectProfile(drop_down.selected() as usize));
-                                }
                             },
                             append = &gtk4::MenuButton {
                                 set_menu_model: Some(&config_menu),
@@ -557,10 +559,17 @@ impl Widgets<AppModel, ()> for AppWidgets {
         first_view_run: bool,
         desktop_settings: gio::Settings,
         device_actions: gio::SimpleActionGroup,
+        profiles_dropdown_signal: glib::SignalHandlerId,
     }
 
     fn post_init() {
         let first_view_run = true;
+
+        let profiles_dropdown_signal = profiles_dropdown.connect_selected_notify(
+            glib::clone!(@strong sender => move |drop_down| {
+                send!(sender, AppMsg::SelectProfile(drop_down.selected() as usize));
+            }),
+        );
 
         // Detect dark/light theme
         fn update_theme(desktop_settings: &gio::Settings, mouse_picture: &gtk4::Picture) {
@@ -710,9 +719,13 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     .map(|(n, profile)| profile.name.as_deref().unwrap_or(default_labels[n]))
                     .collect();
                 self.profiles_dropdown
+                    .block_signal(&self.profiles_dropdown_signal);
+                self.profiles_dropdown
                     .set_model(Some(&gtk4::StringList::new(&labels)));
                 self.profiles_dropdown
                     .set_selected(device.config.profile_num() as u32);
+                self.profiles_dropdown
+                    .unblock_signal(&self.profiles_dropdown_signal);
             }
 
             if model.show_about_mouse {
