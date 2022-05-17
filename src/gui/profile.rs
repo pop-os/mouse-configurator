@@ -64,6 +64,11 @@ impl MouseConfig {
         }
     }
 
+    pub fn new_fake() -> Self {
+        let serial = format!("FAKE{:16X}", rand::random::<u64>());
+        Self::new("Brain".to_string(), serial)
+    }
+
     pub fn profile(&self) -> &Profile {
         &self.profiles[self.profile_num]
     }

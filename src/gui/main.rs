@@ -789,9 +789,17 @@ relm4::new_stateless_action!(ResetAction, DeviceActionGroup, "reset_config");
 
 fn main() {
     let mut args = env::args().skip(1);
-    if args.next().as_deref() == Some("--device-monitor") {
-        device_monitor_process::device_monitor_process();
-        return;
+    match args.next().as_deref() {
+        Some("--device-monitor") => {
+            device_monitor_process::device_monitor_process();
+            return;
+        }
+        Some("--add-fake-device") => {
+            let mut configs = load_config();
+            configs.push(MouseConfig::new_fake());
+            save_config(configs.iter());
+        }
+        _ => {}
     }
 
     gio::resources_register_include!("compiled.gresource").unwrap();
