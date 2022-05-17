@@ -369,6 +369,14 @@ impl Widgets<AppModel, ()> for AppWidgets {
             set_title: Some("HP Mouse"),
             set_default_size: args!(1280, 768),
             set_titlebar = Some(&gtk4::HeaderBar) {
+                pack_start = &gtk4::Button {
+                    add_css_class: "flat",
+                    set_visible: watch! { model.selected_device.is_some() && model.devices.len() > 1 },
+                    set_icon_name: "go-previous-symbolic",
+                    connect_clicked(sender) => move |_| {
+                        send!(sender, AppMsg::SelectDevice(None));
+                    }
+                },
                 pack_end = &gtk4::MenuButton {
                     set_menu_model: Some(&menu),
                     set_icon_name: "open-menu-symbolic"
@@ -427,14 +435,6 @@ impl Widgets<AppModel, ()> for AppWidgets {
                         set_margin_end: 12,
                         set_margin_top: 12,
                         set_margin_bottom: 12,
-                        append = &gtk4::Button {
-                            set_halign: gtk4::Align::Center,
-                            set_label: "Device List",
-                            set_visible: watch! { model.devices.len() > 1 },
-                            connect_clicked(sender) => move |_| {
-                                send!(sender, AppMsg::SelectDevice(None));
-                            }
-                        },
                         append = &gtk4::Box {
                             set_orientation: gtk4::Orientation::Horizontal,
                             set_halign: gtk4::Align::Center,
