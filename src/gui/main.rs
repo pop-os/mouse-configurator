@@ -56,7 +56,7 @@ impl Device {
 
     fn apply_dpi_diff(&mut self, device_id: DeviceId, worker: &RelmWorker<WorkerModel, AppModel>) {
         if let Some(state_dpi) = self.state.dpi {
-            let new = self.round_dpi(self.config.info.dpi);
+            let new = self.round_dpi(self.config.dpi);
             let old = self.round_dpi(state_dpi);
             if old != new {
                 // XXX don't queue infinitely?
@@ -118,11 +118,7 @@ impl AppModel {
         serial: String,
         version: (u16, u16, u16),
     ) {
-        if let Some(idx) = self
-            .devices
-            .iter()
-            .position(|d| d.config.info.serial == serial)
-        {
+        if let Some(idx) = self.devices.iter().position(|d| d.config.serial == serial) {
             let mut device = &mut self.devices[idx];
             if let Some(old_id) = &device.id {
                 self.device_by_id.remove(&old_id);
@@ -273,7 +269,7 @@ impl AppUpdate for AppModel {
             },
             AppMsg::SetDpi(value) => {
                 if let Some(device) = self.device_mut() {
-                    device.config.info.dpi = value;
+                    device.config.dpi = value;
                     if let Some(device_id) = device.id.clone() {
                         device.apply_dpi_diff(device_id, &components.worker);
                     }
@@ -320,7 +316,7 @@ impl AppUpdate for AppModel {
                         profile.bindings.clear();
                         profile.left_handed = false;
                     }
-                    device.config.info.dpi = 1200.; // XXX depend on device
+                    device.config.dpi = 1200.; // XXX depend on device
 
                     if let Some(device_id) = device.id.clone() {
                         device.apply_profile_diff(device_id.clone(), &components.worker);
@@ -541,12 +537,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                         }
                                     },
                                     append = &gtk4::Label {
-                                        set_label: watch! { &model.device().map_or_else(String::new, |device| format!("{}", device.round_dpi(device.config.info.dpi))) },
+                                        set_label: watch! { &model.device().map_or_else(String::new, |device| format!("{}", device.round_dpi(device.config.dpi))) },
                                     },
                                     append: dpi_scale = &gtk4::Scale {
                                         set_hexpand: true,
                                         set_adjustment: &gtk4::Adjustment::new(800., 800., 3000., DPI_STEP, DPI_STEP, 0.), // XXX don't hard-code?
-                                        set_value: watch! { model.device().map_or(0., |device| device.config.info.dpi) },
+                                        set_value: watch! { model.device().map_or(0., |device| device.config.dpi) },
                                         connect_change_value(sender) => move |_, _, value| {
                                             send!(sender, AppMsg::SetDpi(value));
                                             gtk4::Inhibit(false)
@@ -719,7 +715,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                 set_label: "HP 930 series Creator Wireless Mouse" // TODO don't hard-code
                             },
                             append = &gtk4::Label {
-                                set_label: &format!("Serial: {}", device.config.info.serial )
+                                set_label: &format!("Serial: {}", device.config.serial )
                             }
                         }
                     }
@@ -771,8 +767,8 @@ impl Widgets<AppModel, ()> for AppWidgets {
             if model.show_about_mouse {
                 show_info_dialog(
                     &main_window,
-                    &device.config.info.device,
-                    &device.config.info.serial,
+                    &device.config.device,
+                    &device.config.serial,
                     device.state.firmware_version,
                 );
             }

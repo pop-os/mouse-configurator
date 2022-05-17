@@ -34,19 +34,14 @@ pub struct Profile {
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct MouseInfo {
-    pub dpi: f64,
-    pub serial: String,
-    pub device: String,
-}
-
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct MouseConfig {
     // Must always be non-empty
     profiles: Vec<Profile>,
     // Must Always be in range
     profile_num: usize,
-    pub info: MouseInfo,
+    pub dpi: f64,
+    pub serial: String,
+    pub device: String,
 }
 
 impl MouseConfig {
@@ -56,11 +51,9 @@ impl MouseConfig {
         Self {
             profiles,
             profile_num: 0,
-            info: MouseInfo {
-                device,
-                dpi: 1200.,
-                serial,
-            },
+            device,
+            dpi: 1200.,
+            serial,
         }
     }
 
