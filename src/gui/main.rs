@@ -316,11 +316,11 @@ impl AppUpdate for AppModel {
             }
             AppMsg::Reset => {
                 if let Some(device) = self.device_mut() {
-                    device.config.profile_mut().bindings.clear();
-                    device.config.profile_mut().left_handed = false;
+                    for profile in device.config.profiles_mut() {
+                        profile.bindings.clear();
+                        profile.left_handed = false;
+                    }
                     device.config.info.dpi = 1200.; // XXX depend on device
-
-                    // TODO handle profiles
 
                     if let Some(device_id) = device.id.clone() {
                         device.apply_profile_diff(device_id.clone(), &components.worker);

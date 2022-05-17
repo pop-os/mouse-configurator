@@ -81,6 +81,10 @@ impl MouseConfig {
         &self.profiles
     }
 
+    pub fn profiles_mut(&mut self) -> &mut [Profile] {
+        &mut self.profiles
+    }
+
     pub fn select_profile(&mut self, profile: usize) {
         if profile < self.profiles.len() {
             self.profile_num = profile;
