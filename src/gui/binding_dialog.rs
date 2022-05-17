@@ -76,6 +76,7 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
             set_modal: true,
             set_hide_on_close: true,
             set_visible: watch!(model.shown),
+            set_title: Some("Set Binding"),
             set_titlebar = Some(&gtk4::HeaderBar) {
                 pack_start = &gtk4::Button {
                     add_css_class: "flat",
@@ -97,6 +98,7 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
                     set_vhomogeneous: false,
                     set_transition_type: gtk4::StackTransitionType::SlideLeftRight,
                     add_child: category_list_box = &gtk4::ListBox {
+                        set_valign: gtk4::Align::Start,
                         set_hexpand: true,
                         add_css_class: "frame",
                         set_header_func: util::header_func,
@@ -105,20 +107,30 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
                             send!(sender, BindingDialogMsg::SelectCategory(Some(category)));
                         },
                     },
-                    add_child: binding_list_box = &gtk4::ListBox {
-                        set_hexpand: true,
-                        add_css_class: "frame",
-                        set_header_func: util::header_func,
-                        set_filter_func(category, rows) => move |row| {
-                            let row_category = rows[row.index() as usize].0;
-                            ptr::eq(row_category, category.get())
+                    add_child: binding_vbox = &gtk4::Box {
+                        set_orientation: gtk4::Orientation::Vertical,
+                        set_spacing: 6,
+                        append = &gtk4::Label {
+                            set_label: watch! { model.category.map_or("", |x| &x.label) }, // XXX translate
+                            set_attributes = Some(&pango::AttrList) {
+                                insert: pango::AttrInt::new_weight(pango::Weight::Bold)
+                            },
                         },
-                        connect_row_activated(rows) => move |_, row| {
-                            let entry = rows[row.index() as usize].1;
-                            send!(sender, BindingDialogMsg::Selected(entry));
+                        append: binding_list_box = &gtk4::ListBox {
+                            set_hexpand: true,
+                            add_css_class: "frame",
+                            set_header_func: util::header_func,
+                            set_filter_func(category, rows) => move |row| {
+                                let row_category = rows[row.index() as usize].0;
+                                ptr::eq(row_category, category.get())
+                            },
+                            connect_row_activated(rows) => move |_, row| {
+                                let entry = rows[row.index() as usize].1;
+                                send!(sender, BindingDialogMsg::Selected(entry));
 
+                            },
                         },
-                    },
+                    }
                 }
             }
         }
@@ -204,7 +216,7 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
 
     fn post_view() {
         if let Some(category) = model.category.as_ref() {
-            self.stack.set_visible_child(&self.binding_list_box);
+            self.stack.set_visible_child(&self.binding_vbox);
             if !ptr::eq(self.category.get(), *category) {
                 self.category.set(*category);
                 self.binding_list_box.invalidate_filter();
