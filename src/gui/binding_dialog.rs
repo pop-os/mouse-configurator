@@ -8,27 +8,27 @@ use crate::{
     util, AppMsg,
 };
 
-pub enum DialogMsg {
+pub enum BindingDialogMsg {
     Show(HardwareButton),
     #[allow(unused)]
     Hide,
     Selected(&'static Entry),
 }
 
-pub struct DialogModel {
+pub struct BindingDialogModel {
     button_id: HardwareButton,
     shown: bool,
 }
 
-impl Model for DialogModel {
-    type Msg = DialogMsg;
-    type Widgets = DialogWidgets;
+impl Model for BindingDialogModel {
+    type Msg = BindingDialogMsg;
+    type Widgets = BindingDialogWidgets;
     type Components = ();
 }
 
-impl ComponentUpdate<super::AppModel> for DialogModel {
+impl ComponentUpdate<super::AppModel> for BindingDialogModel {
     fn init_model(_parent_model: &super::AppModel) -> Self {
-        DialogModel {
+        BindingDialogModel {
             button_id: HardwareButton::Right,
             shown: false,
         }
@@ -36,20 +36,20 @@ impl ComponentUpdate<super::AppModel> for DialogModel {
 
     fn update(
         &mut self,
-        msg: DialogMsg,
+        msg: BindingDialogMsg,
         _components: &(),
-        _sender: Sender<DialogMsg>,
+        _sender: Sender<BindingDialogMsg>,
         parent_sender: Sender<AppMsg>,
     ) {
         match msg {
-            DialogMsg::Show(button_id) => {
+            BindingDialogMsg::Show(button_id) => {
                 self.button_id = button_id;
                 self.shown = true;
             }
-            DialogMsg::Hide => {
+            BindingDialogMsg::Hide => {
                 self.shown = false;
             }
-            DialogMsg::Selected(entry) => {
+            BindingDialogMsg::Selected(entry) => {
                 send!(
                     parent_sender,
                     AppMsg::SetBinding(self.button_id, Binding::Preset(entry.id))
@@ -61,7 +61,7 @@ impl ComponentUpdate<super::AppModel> for DialogModel {
 }
 
 #[relm4::widget(pub)]
-impl Widgets<DialogModel, super::AppModel> for DialogWidgets {
+impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
     view! {
         gtk4::Dialog {
             set_transient_for: parent!(Some(&parent_widgets.main_window)),
@@ -139,7 +139,7 @@ impl Widgets<DialogModel, super::AppModel> for DialogWidgets {
 
             let sender = sender.clone();
             list_box.connect_row_activated(move |_, row| {
-                send!(sender, DialogMsg::Selected(rows.get(row).unwrap()));
+                send!(sender, BindingDialogMsg::Selected(rows.get(row).unwrap()));
             });
         }
     }

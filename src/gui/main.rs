@@ -9,12 +9,12 @@ use hp_mouse_configurator::Event;
 
 mod bindings;
 use bindings::HardwareButton;
+mod binding_dialog;
+use binding_dialog::{BindingDialogModel, BindingDialogMsg};
 mod buttons_widget;
 use buttons_widget::{ButtonsWidget, BUTTONS, IMAGE_WIDTH};
 mod device_monitor_process;
 use device_monitor_process::DeviceMonitorProcess;
-mod dialog;
-use dialog::{DialogModel, DialogMsg};
 mod keycode;
 mod profile;
 use profile::{apply_profile_diff, load_config, save_config, Binding, MouseConfig, MouseState};
@@ -28,7 +28,7 @@ const DPI_STEP: f64 = 50.;
 
 #[derive(relm4::Components)]
 struct AppComponents {
-    dialog: RelmComponent<DialogModel, AppModel>,
+    dialog: RelmComponent<BindingDialogModel, AppModel>,
     swap_button_dialog: RelmComponent<SwapButtonDialogModel, AppModel>,
     worker: RelmWorker<WorkerModel, AppModel>,
 }
@@ -280,7 +280,7 @@ impl AppUpdate for AppModel {
             AppMsg::SelectButton(button) => {
                 let button = self.swap_buttons(button);
                 if let Some(id) = button {
-                    send!(components.dialog, DialogMsg::Show(id))
+                    send!(components.dialog, BindingDialogMsg::Show(id))
                 } else {
                     let left_handed = self
                         .device()
