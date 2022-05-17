@@ -1,4 +1,4 @@
-use gtk4::{pango, prelude::*};
+use gtk4::{glib, pango, prelude::*};
 use relm4::{send, view, ComponentUpdate, Model, Sender, Widgets};
 use std::{cell::Cell, collections::HashMap, ptr, rc::Rc};
 
@@ -47,7 +47,7 @@ impl ComponentUpdate<super::AppModel> for BindingDialogModel {
         match msg {
             BindingDialogMsg::Show(button_id) => {
                 self.button_id = button_id;
-                self.category = None; // XXX no transition?
+                self.category = None;
                 self.shown = true;
             }
             BindingDialogMsg::Hide => {
@@ -70,7 +70,7 @@ impl ComponentUpdate<super::AppModel> for BindingDialogModel {
 #[relm4::widget(pub)]
 impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
     view! {
-        gtk4::Dialog {
+        dialog = gtk4::Dialog {
             set_transient_for: parent!(Some(&parent_widgets.main_window)),
             set_default_size: args!(300, 300),
             set_modal: true,
@@ -212,6 +212,17 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
                 rows.insert(row, entry);
             }
         }
+
+        // Avoid transition on reopening
+        dialog.connect_visible_notify(
+            glib::clone!(@strong stack, @strong category_list_box => move |dialog| {
+                if !dialog.is_visible() {
+                    stack.set_transition_type(gtk4::StackTransitionType::None);
+                    stack.set_visible_child(&category_list_box);
+                    stack.set_transition_type(gtk4::StackTransitionType::SlideLeftRight);
+                }
+            }),
+        );
     }
 
     fn post_view() {
