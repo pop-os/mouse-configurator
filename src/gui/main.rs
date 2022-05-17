@@ -428,13 +428,13 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     },
                     add_child: device_page = &gtk4::Box {
                         set_orientation: gtk4::Orientation::Vertical,
-                        set_spacing: 6,
+                        set_spacing: 18,
                         set_halign: gtk4::Align::Center,
                         set_hexpand: false,
                         set_margin_start: 12,
                         set_margin_end: 12,
-                        set_margin_top: 12,
-                        set_margin_bottom: 12,
+                        set_margin_top: 18,
+                        set_margin_bottom: 36,
                         append = &gtk4::Box {
                             set_orientation: gtk4::Orientation::Horizontal,
                             set_halign: gtk4::Align::Center,
@@ -466,6 +466,8 @@ impl Widgets<AppModel, ()> for AppWidgets {
                             },
                         },
                         append = &gtk4::Box {
+                            set_margin_bottom: 18,
+                            set_spacing: 8,
                             set_orientation: gtk4::Orientation::Horizontal,
                             append = &gtk4::Label {
                                 set_label: "Configuration",
@@ -505,7 +507,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                         },
                         append = &gtk4::Label {
                             set_label: "Select a button to change its binding. Your settings are automatically saved to firmware.",
-                            set_margin_bottom: 12,
+                            set_margin_bottom: 18,
                         },
                         append = &gtk4::Label {
                             set_label: "Sensitivity",
@@ -521,11 +523,12 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                 set_activatable: false,
                                 set_child = Some(&gtk4::Box) {
                                     set_orientation: gtk4::Orientation::Horizontal,
+                                    set_margin_top: 6,
+                                    set_margin_bottom: 6,
+                                    set_margin_start: 6,
+                                    set_margin_end: 6,
                                     append = &gtk4::Box {
-                                        set_margin_top: 6,
-                                        set_margin_bottom: 6,
-                                        set_margin_start: 6,
-                                        set_margin_end: 6,
+                                        set_margin_end: 36,
                                         set_orientation: gtk4::Orientation::Vertical,
                                         append = &gtk4::Label {
                                             set_label: "Mouse Cursor Speed",
