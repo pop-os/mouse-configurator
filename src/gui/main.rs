@@ -3,7 +3,7 @@ use relm4::{
     actions::{RelmAction, RelmActionGroup},
     send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets,
 };
-use std::{collections::HashMap, env, process::Command};
+use std::{collections::HashMap, env, path::PathBuf, process::Command};
 
 use hp_mouse_configurator::Event;
 
@@ -16,7 +16,9 @@ use buttons_widget::{ButtonsWidget, BUTTONS, IMAGE_WIDTH};
 mod device_monitor_process;
 use device_monitor_process::DeviceMonitorProcess;
 mod dialogs;
-use dialogs::{show_about_dialog, show_info_dialog, show_prompt_dialog};
+use dialogs::{
+    show_about_dialog, show_export_dialog, show_import_dialog, show_info_dialog, show_prompt_dialog,
+};
 mod keycode;
 mod profile;
 use profile::{
@@ -225,6 +227,8 @@ enum AppMsg {
     SaveConfig,
     ShowAboutMouse,
     SelectProfile(usize),
+    ExportConfig(PathBuf),
+    ImportConfig(PathBuf),
 }
 
 impl Model for AppModel {
@@ -390,6 +394,12 @@ impl AppUpdate for AppModel {
                         self.bindings_changed = true;
                     }
                 }
+            }
+            AppMsg::ImportConfig(path) => {
+                // TODO
+            }
+            AppMsg::ExportConfig(path) => {
+                // TODO
             }
         }
         true
@@ -677,6 +687,22 @@ impl Widgets<AppModel, ()> for AppWidgets {
             }));
         app_group.add_action(about_action);
 
+        let import_action: RelmAction<ImportConfig> = RelmAction::new_stateless(
+            glib::clone!(@strong main_window, @strong sender => move |_| {
+                show_import_dialog(&main_window, glib::clone!(@strong sender => move |path| {
+                    send!(sender, AppMsg::ImportConfig(path));
+                }));
+            }),
+        );
+        device_group.add_action(import_action);
+        let export_action: RelmAction<ExportConfig> = RelmAction::new_stateless(
+            glib::clone!(@strong main_window, @strong sender => move |_| {
+                show_export_dialog(&main_window, glib::clone!(@strong sender => move |path| {
+                    send!(sender, AppMsg::ExportConfig(path));
+                }));
+            }),
+        );
+        device_group.add_action(export_action);
         let reset_action: RelmAction<ResetAction> = RelmAction::new_stateless(
             glib::clone!(@strong main_window, @strong sender => move |_| {
                 show_prompt_dialog(&main_window, "Reset sensitivity and all configurations for this device?",
@@ -685,6 +711,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                     }));
             }),
         );
+        // XXX Only show, make sensitive when device not connected?
         device_group.add_action(reset_action);
         let remove_action: RelmAction<RemoveAction> = RelmAction::new_stateless(
             glib::clone!(@strong main_window, @strong sender => move |_| {

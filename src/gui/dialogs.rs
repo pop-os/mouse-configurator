@@ -1,5 +1,6 @@
 use gtk4::prelude::*;
 use relm4::view;
+use std::path::PathBuf;
 
 use crate::util;
 
@@ -126,4 +127,67 @@ pub fn show_prompt_dialog(
         dialog.close();
     });
     dialog.show();
+}
+
+fn show_file_dialog(
+    main_window: &gtk4::ApplicationWindow,
+    cb: impl Fn(PathBuf) + 'static,
+    export: bool,
+) {
+    let (title, accept_label, action) = if export {
+        (
+            "Export Configuration",
+            "_Export",
+            gtk4::FileChooserAction::Save,
+        )
+    } else {
+        (
+            "Import Configuration",
+            "_Import",
+            gtk4::FileChooserAction::Open,
+        )
+    };
+
+    let dialog = gtk4::FileChooserDialog::new(
+        Some(title),
+        Some(main_window),
+        action,
+        &[
+            ("_Cancel", gtk4::ResponseType::Cancel),
+            (accept_label, gtk4::ResponseType::Ok),
+        ],
+    );
+
+    let filter = gtk4::FileFilter::new();
+    filter.set_name(Some("json"));
+    filter.add_pattern("*.json");
+    dialog.add_filter(&filter);
+
+    dialog
+        .titlebar()
+        .unwrap()
+        .downcast_ref::<gtk4::HeaderBar>()
+        .unwrap()
+        .set_show_title_buttons(false);
+    dialog.set_modal(true);
+    dialog.set_margin_start(6);
+
+    dialog.connect_response(move |dialog, response| {
+        if response == gtk4::ResponseType::Ok {
+            if let Some(choice) = dialog.file().and_then(|x| x.path()) {
+                cb(choice);
+            }
+        }
+        dialog.close();
+    });
+
+    dialog.show();
+}
+
+pub fn show_import_dialog(main_window: &gtk4::ApplicationWindow, cb: impl Fn(PathBuf) + 'static) {
+    show_file_dialog(main_window, cb, false);
+}
+
+pub fn show_export_dialog(main_window: &gtk4::ApplicationWindow, cb: impl Fn(PathBuf) + 'static) {
+    show_file_dialog(main_window, cb, true);
 }
