@@ -1,5 +1,10 @@
 use relm4::{send, RelmWorker};
-use std::{collections::HashMap, env, fs::File, path::PathBuf};
+use std::{
+    collections::HashMap,
+    env,
+    fs::File,
+    path::{Path, PathBuf},
+};
 
 use super::{
     bindings::{Entry, HardwareButton, PresetBinding},
@@ -86,6 +91,16 @@ impl MouseConfig {
 
     pub fn profile_num(&self) -> usize {
         self.profile_num
+    }
+
+    pub fn import(path: &Path) -> Result<Self, String> {
+        let file = File::open(path).map_err(|x| x.to_string())?;
+        serde_json::from_reader(file).map_err(|x| x.to_string())
+    }
+
+    pub fn export(&self, path: &Path) -> Result<(), String> {
+        let file = File::create(path).map_err(|x| x.to_string())?;
+        serde_json::to_writer(file, self).map_err(|x| x.to_string())
     }
 }
 

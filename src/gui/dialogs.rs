@@ -171,6 +171,9 @@ fn show_file_dialog(
         .set_show_title_buttons(false);
     dialog.set_modal(true);
     dialog.set_margin_start(6);
+    if export {
+        dialog.set_current_name("Untitled.json");
+    }
 
     dialog.connect_response(move |dialog, response| {
         if response == gtk4::ResponseType::Ok {

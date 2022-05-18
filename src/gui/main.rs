@@ -396,10 +396,24 @@ impl AppUpdate for AppModel {
                 }
             }
             AppMsg::ImportConfig(path) => {
-                // TODO
+                if let Some(device) = self.device_mut() {
+                    match MouseConfig::import(&path) {
+                        Ok(config) => {
+                            device.config = config;
+                        }
+                        // TODO
+                        Err(err) => {}
+                    }
+                }
             }
             AppMsg::ExportConfig(path) => {
-                // TODO
+                if let Some(device) = self.device_mut() {
+                    match device.config.export(&path) {
+                        Ok(()) => {}
+                        // TODO
+                        Err(err) => {}
+                    }
+                }
             }
         }
         true
