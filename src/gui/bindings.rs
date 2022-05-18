@@ -2,6 +2,7 @@
 // - Need way to get label, binding, from json representation
 
 use once_cell::sync::Lazy;
+use serde::de::{self, Error};
 use std::collections::HashMap;
 
 use crate::keycode::*;
@@ -9,7 +10,7 @@ use hp_mouse_configurator::{Op, Value::*};
 
 // TODO better naming? Important if serialized in json.
 #[repr(u8)]
-#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Copy, Hash, Eq, PartialEq, Debug)]
 pub enum HardwareButton {
     Right = 0,
     Middle = 1,
@@ -18,6 +19,22 @@ pub enum HardwareButton {
     ScrollLeft = 4,
     ScrollRight = 5,
     LeftCenter = 6,
+}
+
+// Serialize as int to be future-proof for more devices, and not depend on naming
+impl serde::Serialize for HardwareButton {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        (*self as u8).serialize(serializer)
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for HardwareButton {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let num = u8::deserialize(deserializer)?;
+        Self::from_u8(num).ok_or_else(|| {
+            D::Error::invalid_value(de::Unexpected::Unsigned(num.into()), &"button index 0-6")
+        })
+    }
 }
 
 impl HardwareButton {
