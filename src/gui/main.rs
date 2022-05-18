@@ -16,7 +16,7 @@ use buttons_widget::{ButtonsWidget, BUTTONS, IMAGE_WIDTH};
 mod device_monitor_process;
 use device_monitor_process::DeviceMonitorProcess;
 mod dialogs;
-use dialogs::{show_about_dialog, show_info_dialog};
+use dialogs::{show_about_dialog, show_info_dialog, show_prompt_dialog};
 mod keycode;
 mod profile;
 use profile::{apply_profile_diff, load_config, save_config, Binding, MouseConfig, MouseState};
@@ -638,10 +638,14 @@ impl Widgets<AppModel, ()> for AppWidgets {
             }));
         app_group.add_action(about_action);
 
-        let reset_action: RelmAction<ResetAction> =
-            RelmAction::new_stateless(glib::clone!(@strong sender => move |_| {
-                send!(sender, AppMsg::Reset);
-            }));
+        let reset_action: RelmAction<ResetAction> = RelmAction::new_stateless(
+            glib::clone!(@strong main_window, @strong sender => move |_| {
+                show_prompt_dialog(&main_window, "Reset sensitivity and all configurations for this device?",
+                    glib::clone!(@strong sender => move || {
+                        send!(sender, AppMsg::Reset);
+                    }));
+            }),
+        );
         device_group.add_action(reset_action);
 
         let app_actions = app_group.into_action_group();

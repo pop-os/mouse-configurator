@@ -106,3 +106,24 @@ pub fn show_info_dialog(
     }
     dialog.show();
 }
+
+pub fn show_prompt_dialog(
+    main_window: &gtk4::ApplicationWindow,
+    text: &str,
+    cb: impl Fn() + 'static,
+) {
+    let dialog = gtk4::MessageDialog::builder()
+        .transient_for(main_window)
+        .modal(true)
+        .message_type(gtk4::MessageType::Question)
+        .buttons(gtk4::ButtonsType::OkCancel)
+        .text(text)
+        .build();
+    dialog.connect_response(move |dialog, response| {
+        if response == gtk4::ResponseType::Ok {
+            cb();
+        }
+        dialog.close();
+    });
+    dialog.show();
+}
