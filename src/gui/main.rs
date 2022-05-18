@@ -158,6 +158,34 @@ impl AppModel {
         }
     }
 
+    fn remove_device(&mut self, device: usize) {
+        self.devices.remove(device);
+
+        self.device_by_id = self
+            .device_by_id
+            .drain()
+            .filter_map(|(id, d)| {
+                if d == device {
+                    None
+                } else if d > device {
+                    Some((id, d - 1))
+                } else {
+                    Some((id, d))
+                }
+            })
+            .collect();
+
+        if let Some(selected_device) = self.selected_device {
+            if selected_device == device {
+                self.set_selected_device(None);
+            } else if selected_device > device {
+                self.set_selected_device(Some(selected_device - 1));
+            }
+        }
+
+        self.device_list_changed = true;
+    }
+
     // Swap left and right buttons, if in left handed mode
     fn swap_buttons(&self, button: Option<HardwareButton>) -> Option<HardwareButton> {
         if let Some(device) = self.device() {
@@ -192,6 +220,7 @@ enum AppMsg {
     SelectButton(Option<HardwareButton>),
     SetLeftHanded(bool),
     Reset,
+    Remove,
     SelectDevice(Option<usize>),
     SaveConfig,
     ShowAboutMouse,
@@ -330,6 +359,11 @@ impl AppUpdate for AppModel {
                     }
 
                     self.bindings_changed = true;
+                }
+            }
+            AppMsg::Remove => {
+                if let Some(device) = self.selected_device {
+                    self.remove_device(device);
                 }
             }
             AppMsg::SelectDevice(idx) => {
@@ -567,10 +601,11 @@ impl Widgets<AppModel, ()> for AppWidgets {
 
     menu! {
         menu: {
-            "Reset to Default" => ResetAction,
-            "About" => AboutAction,
             "Import Configuration" => ImportConfig,
             "Export Configuration" => ExportConfig,
+            "Reset to Default" => ResetAction,
+            "Remove Device" => RemoveAction,
+            "About" => AboutAction,
         }
     }
 
@@ -651,6 +686,15 @@ impl Widgets<AppModel, ()> for AppWidgets {
             }),
         );
         device_group.add_action(reset_action);
+        let remove_action: RelmAction<RemoveAction> = RelmAction::new_stateless(
+            glib::clone!(@strong main_window, @strong sender => move |_| {
+                show_prompt_dialog(&main_window, "Remove device and saved configurations?",
+                    glib::clone!(@strong sender => move || {
+                        send!(sender, AppMsg::Remove);
+                    }));
+            }),
+        );
+        device_group.add_action(remove_action);
 
         let app_actions = app_group.into_action_group();
         let device_actions = device_group.into_action_group();
@@ -793,6 +837,7 @@ relm4::new_action_group!(DeviceActionGroup, "device");
 relm4::new_stateless_action!(ImportConfig, DeviceActionGroup, "import_config");
 relm4::new_stateless_action!(ExportConfig, DeviceActionGroup, "export_config");
 relm4::new_stateless_action!(ResetAction, DeviceActionGroup, "reset_config");
+relm4::new_stateless_action!(RemoveAction, DeviceActionGroup, "remove");
 
 fn main() {
     let mut args = env::args().skip(1);
