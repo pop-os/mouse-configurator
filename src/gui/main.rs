@@ -19,7 +19,9 @@ mod dialogs;
 use dialogs::{show_about_dialog, show_info_dialog, show_prompt_dialog};
 mod keycode;
 mod profile;
-use profile::{apply_profile_diff, load_config, save_config, Binding, MouseConfig, MouseState};
+use profile::{
+    apply_profile_diff, load_config, save_config, Binding, MouseConfig, MouseState, Profile,
+};
 mod swap_button_dialog;
 use swap_button_dialog::{SwapButtonDialogModel, SwapButtonDialogMsg};
 mod util;
@@ -313,8 +315,7 @@ impl AppUpdate for AppModel {
             AppMsg::Reset => {
                 if let Some(device) = self.device_mut() {
                     for profile in device.config.profiles_mut() {
-                        profile.bindings.clear();
-                        profile.left_handed = false;
+                        *profile = Profile::default();
                     }
                     device.config.dpi = 1200.; // XXX depend on device
 
