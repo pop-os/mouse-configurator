@@ -142,8 +142,7 @@ impl AppModel {
             let idx = self.devices.len() - 1;
             self.device_by_id.insert(device_id.clone(), idx);
             if idx == 0 {
-                self.selected_device = Some(0);
-                self.bindings_changed = true;
+                self.set_selected_device(None);
             }
             self.device_list_changed = true;
         }
@@ -172,6 +171,12 @@ impl AppModel {
         } else {
             button
         }
+    }
+
+    fn set_selected_device(&mut self, selected_device: Option<usize>) {
+        self.selected_device = selected_device.filter(|x| *x < self.devices.len());
+        self.bindings_changed = true;
+        self.profiles_changed = true;
     }
 }
 
@@ -329,9 +334,7 @@ impl AppUpdate for AppModel {
             }
             AppMsg::SelectDevice(idx) => {
                 if idx != self.selected_device {
-                    self.selected_device = idx.filter(|idx| *idx < self.devices.len());
-                    self.bindings_changed = true;
-                    self.profiles_changed = true;
+                    self.set_selected_device(idx);
                 }
             }
             AppMsg::SaveConfig => {
