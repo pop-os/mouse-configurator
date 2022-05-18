@@ -15,6 +15,7 @@ APPID = "com.hp.mouse-configurator"
 BIN=hp-mouse-configurator
 DESKTOP = $(APPID).desktop
 ICON = $(APPID).svg
+APPDATA = $(APPID).appdata.xml
 
 TARGET = debug
 DEBUG ?= 0
@@ -40,11 +41,13 @@ install: all
 	install -D -m 0755 "target/release/$(BIN)" "$(DESTDIR)$(bindir)/$(BIN)"
 	install -Dm0644 "data/$(DESKTOP)" "$(DESTDIR)$(datadir)/applications/$(DESKTOP)"
 	install -Dm0644 "data/$(ICON)" "$(DESTDIR)$(datadir)/icons/hicolor/scalable/apps/$(ICON)"
+	install -Dm0644 "data/$(APPDATA)" "$(DESTDIR)$(datadir)/metainfo/$(APPDATA)"
 
 uninstall:
 	rm -f "$(DESTDIR)$(bindir)/$(BIN)"
 	rm -f "$(DESTDIR)$(datadir)/applications/$(DESKTOP)"
 	rm -f "$(DESTDIR)$(datadir)/icons/hicolor/scalable/apps/$(ICON)"
+	rm -f "$(DESTDIR)$(datadir)/metainfo/$(APPDATA)"
 
 update:
 	cargo update
