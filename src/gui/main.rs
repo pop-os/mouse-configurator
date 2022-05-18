@@ -739,6 +739,14 @@ impl Widgets<AppModel, ()> for AppWidgets {
 
     fn post_view() {
         if model.selected_device.is_some() {
+            let connected = model.device().map_or(false, |x| x.state.connected);
+            self.device_actions
+                .lookup_action("remove")
+                .unwrap()
+                .downcast_ref::<gio::SimpleAction>()
+                .unwrap()
+                .set_enabled(!connected);
+
             self.stack.set_visible_child(&self.device_page);
             let in_rename_config = self.profiles_stack.visible_child().as_ref()
                 == Some(self.profiles_entry.upcast_ref::<gtk4::Widget>());
