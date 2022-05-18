@@ -142,7 +142,7 @@ impl AppModel {
             let idx = self.devices.len() - 1;
             self.device_by_id.insert(device_id.clone(), idx);
             if idx == 0 {
-                self.set_selected_device(None);
+                self.set_selected_device(Some(0));
             }
             self.device_list_changed = true;
         }
