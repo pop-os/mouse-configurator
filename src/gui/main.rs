@@ -3,7 +3,7 @@ use relm4::{
     actions::{RelmAction, RelmActionGroup},
     send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets,
 };
-use std::{collections::HashMap, env, mem, path::PathBuf, process::Command};
+use std::{collections::HashMap, env, path::PathBuf, process::Command};
 
 use hp_mouse_configurator::Event;
 
@@ -41,6 +41,7 @@ struct Device {
     id: Option<DeviceId>,
     state: MouseState,
     config: MouseConfig,
+    serial: String,
 }
 
 impl Device {
@@ -87,10 +88,11 @@ impl AppModel {
     fn new(device_monitor: Option<DeviceMonitorProcess>) -> Self {
         let devices: Vec<_> = load_config()
             .into_iter()
-            .map(|config| Device {
+            .map(|(serial, config)| Device {
                 id: None,
                 state: MouseState::default(),
                 config,
+                serial,
             })
             .collect();
         let selected_device = if devices.len() == 1 { Some(0) } else { None };
@@ -121,7 +123,7 @@ impl AppModel {
         serial: String,
         version: (u16, u16, u16),
     ) {
-        if let Some(idx) = self.devices.iter().position(|d| d.config.serial == serial) {
+        if let Some(idx) = self.devices.iter().position(|d| d.serial == serial) {
             let mut device = &mut self.devices[idx];
             if let Some(old_id) = &device.id {
                 self.device_by_id.remove(&old_id);
@@ -134,7 +136,8 @@ impl AppModel {
             let mut device = Device {
                 id: Some(device_id.clone()),
                 state: MouseState::default(),
-                config: MouseConfig::new(device, serial),
+                config: MouseConfig::new(device),
+                serial,
             };
             device.state.set_connected();
             device.state.firmware_version = Some(version);
@@ -376,7 +379,7 @@ impl AppUpdate for AppModel {
                 }
             }
             AppMsg::SaveConfig => {
-                save_config(self.devices.iter().map(|x| &x.config));
+                save_config(self.devices.iter().map(|x| (&x.serial, &x.config)));
             }
             AppMsg::ShowAboutMouse => {
                 self.show_about_mouse = true;
@@ -399,9 +402,7 @@ impl AppUpdate for AppModel {
                 if let Some(device) = self.device_mut() {
                     match MouseConfig::import(&path) {
                         Ok(config) => {
-                            let serial = mem::take(&mut device.config.serial);
                             device.config = config;
-                            device.config.serial = serial;
                         }
                         Err(err) => {
                             self.error = Some(format!("Failed to import config: {}", err));
@@ -824,7 +825,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                 set_label: "HP 930 series Creator Wireless Mouse" // TODO don't hard-code
                             },
                             append = &gtk4::Label {
-                                set_label: &format!("Serial: {}", device.config.serial )
+                                set_label: &format!("Serial: {}", device.serial )
                             }
                         }
                     }
@@ -877,7 +878,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                 show_info_dialog(
                     &main_window,
                     &device.config.device,
-                    &device.config.serial,
+                    &device.serial,
                     device.state.firmware_version,
                 );
             }
@@ -905,7 +906,8 @@ fn main() {
         }
         Some("--add-fake-device") => {
             let mut configs = load_config();
-            configs.push(MouseConfig::new_fake());
+            let serial = format!("FAKE{:16X}", rand::random::<u64>());
+            configs.insert(serial, MouseConfig::new("Brain".to_string()));
             save_config(configs.iter());
         }
         _ => {}

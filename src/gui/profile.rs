@@ -45,26 +45,19 @@ pub struct MouseConfig {
     // Must Always be in range
     profile_num: usize,
     pub dpi: f64,
-    pub serial: String,
     pub device: String,
 }
 
 impl MouseConfig {
     // XXX Default DPI should depend on device model
-    pub fn new(device: String, serial: String) -> Self {
+    pub fn new(device: String) -> Self {
         let profiles = (0..4).map(|_| Profile::default()).collect();
         Self {
             profiles,
             profile_num: 0,
             device,
             dpi: 1200.,
-            serial,
         }
-    }
-
-    pub fn new_fake() -> Self {
-        let serial = format!("FAKE{:16X}", rand::random::<u64>());
-        Self::new("Brain".to_string(), serial)
     }
 
     pub fn profile(&self) -> &Profile {
@@ -228,26 +221,26 @@ fn app_data_dir() -> PathBuf {
 
 // TODO: format? Multiple files?
 // XXX error handling? Don't run `app_data_dir` every save?
-pub fn load_config() -> Vec<MouseConfig> {
+pub fn load_config() -> HashMap<String, MouseConfig> {
     let mut path = app_data_dir();
     path.push("config.json");
 
     let file = match File::open(&path) {
         Ok(file) => file,
         Err(_) => {
-            return Vec::new();
+            return HashMap::new();
         }
     };
 
-    let mut config: Vec<MouseConfig> = match serde_json::from_reader(file) {
+    let mut config: HashMap<String, MouseConfig> = match serde_json::from_reader(file) {
         Ok(config) => config,
         Err(err) => {
             eprintln!("Failed to load config: {}", err);
-            return Vec::new();
+            return HashMap::new();
         }
     };
     // Ensure there are exactly 4 profiles. May change in future.
-    for mouse in &mut config {
+    for mouse in config.values_mut() {
         mouse.profiles.truncate(4);
         while mouse.profiles.len() < 4 {
             mouse.profiles.push(Profile::default());
@@ -258,11 +251,11 @@ pub fn load_config() -> Vec<MouseConfig> {
 
 // TODO: atomic replace
 // TODO: don't collect? `SeqIteratorVisitor`
-pub fn save_config<'a, T: Iterator<Item = &'a MouseConfig>>(config: T) {
+pub fn save_config<'a, T: Iterator<Item = (&'a String, &'a MouseConfig)>>(config: T) {
     let mut path = app_data_dir();
     path.push("config.json");
 
-    let config: Vec<_> = config.collect();
+    let config: HashMap<_, _> = config.collect();
 
     let file = File::create(&path).unwrap();
     serde_json::to_writer(file, &config).unwrap();
