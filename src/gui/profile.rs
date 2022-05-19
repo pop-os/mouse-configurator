@@ -93,7 +93,7 @@ impl MouseConfig {
 
     pub fn export(&self, path: &Path) -> Result<(), String> {
         let file = File::create(path).map_err(|x| x.to_string())?;
-        serde_json::to_writer(file, self).map_err(|x| x.to_string())
+        serde_json::to_writer_pretty(file, self).map_err(|x| x.to_string())
     }
 }
 
