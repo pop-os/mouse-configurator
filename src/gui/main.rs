@@ -351,6 +351,7 @@ impl AppUpdate for AppModel {
                     if let Some(device_id) = device.id.clone() {
                         device.apply_profile_diff(device_id, &components.worker);
                     }
+                    self.bindings_changed = true;
                 }
             }
             AppMsg::Reset => {
