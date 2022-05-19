@@ -3,7 +3,7 @@ use relm4::{
     actions::{RelmAction, RelmActionGroup},
     send, view, AppUpdate, Model, RelmApp, RelmComponent, RelmWorker, Sender, Widgets,
 };
-use std::{collections::HashMap, env, path::PathBuf, process::Command};
+use std::{collections::HashMap, env, mem, path::PathBuf, process::Command};
 
 use hp_mouse_configurator::Event;
 
@@ -399,7 +399,9 @@ impl AppUpdate for AppModel {
                 if let Some(device) = self.device_mut() {
                     match MouseConfig::import(&path) {
                         Ok(config) => {
+                            let serial = mem::take(&mut device.config.serial);
                             device.config = config;
+                            device.config.serial = serial;
                         }
                         Err(err) => {
                             self.error = Some(format!("Failed to import config: {}", err));
