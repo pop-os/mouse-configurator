@@ -129,6 +129,18 @@ pub fn show_prompt_dialog(
     dialog.show();
 }
 
+pub fn show_error_dialog(main_window: &gtk4::ApplicationWindow, text: &str) {
+    let dialog = gtk4::MessageDialog::builder()
+        .transient_for(main_window)
+        .modal(true)
+        .message_type(gtk4::MessageType::Error)
+        .buttons(gtk4::ButtonsType::Ok)
+        .text(text)
+        .build();
+    dialog.connect_response(|dialog, _| dialog.close());
+    dialog.show();
+}
+
 fn show_file_dialog(
     main_window: &gtk4::ApplicationWindow,
     cb: impl Fn(PathBuf) + 'static,

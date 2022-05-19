@@ -16,9 +16,7 @@ use buttons_widget::{ButtonsWidget, BUTTONS, IMAGE_WIDTH};
 mod device_monitor_process;
 use device_monitor_process::DeviceMonitorProcess;
 mod dialogs;
-use dialogs::{
-    show_about_dialog, show_export_dialog, show_import_dialog, show_info_dialog, show_prompt_dialog,
-};
+use dialogs::*;
 mod keycode;
 mod profile;
 use profile::{
@@ -82,6 +80,7 @@ struct AppModel {
     show_about_mouse: bool,
     rename_config: bool,
     device_monitor: Option<DeviceMonitorProcess>,
+    error: Option<String>,
 }
 
 impl AppModel {
@@ -243,6 +242,7 @@ impl AppUpdate for AppModel {
         self.device_list_changed = false;
         self.show_about_mouse = false;
         self.profiles_changed = false;
+        self.error = None;
 
         match msg {
             AppMsg::ToggleRenameConfig => {
@@ -401,8 +401,9 @@ impl AppUpdate for AppModel {
                         Ok(config) => {
                             device.config = config;
                         }
-                        // TODO
-                        Err(err) => {}
+                        Err(err) => {
+                            self.error = Some(format!("Failed to import config: {}", err));
+                        }
                     }
                 }
             }
@@ -410,8 +411,9 @@ impl AppUpdate for AppModel {
                 if let Some(device) = self.device_mut() {
                     match device.config.export(&path) {
                         Ok(()) => {}
-                        // TODO
-                        Err(err) => {}
+                        Err(err) => {
+                            self.error = Some(format!("Failed to export config: {}", err));
+                        }
                     }
                 }
             }
@@ -752,6 +754,10 @@ impl Widgets<AppModel, ()> for AppWidgets {
     }
 
     fn post_view() {
+        if let Some(error) = model.error.as_ref() {
+            show_error_dialog(&main_window, error);
+        }
+
         if model.selected_device.is_some() {
             let connected = model.device().map_or(false, |x| x.state.connected);
             self.device_actions
