@@ -933,10 +933,10 @@ fn main() {
         gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
 
-    glib::set_prgname(Some("com.pop_os.mouseconfigurator"));
+    glib::set_prgname(Some("org.pop_os.mouseconfigurator"));
     glib::set_application_name("Mouse Configurator");
     let app = gtk4::Application::builder()
-        .application_id("com.pop_os.mouseconfigurator")
+        .application_id("org.pop_os.mouseconfigurator")
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
     let device_monitor = if !app.is_remote() {
