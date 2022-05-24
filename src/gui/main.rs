@@ -663,9 +663,9 @@ impl Widgets<AppModel, ()> for AppWidgets {
                 .as_str()
                 .contains("dark")
             {
-                "/org/pop-os/hp-mouse-configurator/mouse-dark.svg"
+                "/org/pop-os/mouse-configurator/mouse-dark.svg"
             } else {
-                "/org/pop-os/hp-mouse-configurator/mouse-light.svg"
+                "/org/pop-os/mouse-configurator/mouse-light.svg"
             };
             mouse_picture.set_pixbuf(Some(
                 &gdk_pixbuf::Pixbuf::from_resource_at_scale(resource, IMAGE_WIDTH, -1, true)

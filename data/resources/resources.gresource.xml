@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <gresources>
-  <gresource prefix="/org/pop-os/hp-mouse-configurator">
+  <gresource prefix="/org/pop-os/mouse-configurator">
     <file>mouse-dark.svg</file>
     <file>mouse-light.svg</file>
   </gresource>
