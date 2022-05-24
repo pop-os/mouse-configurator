@@ -212,7 +212,7 @@ fn data_dir() -> PathBuf {
 
 fn app_data_dir() -> PathBuf {
     let mut dir = data_dir();
-    dir.push("hp-mouse-configurator");
+    dir.push("com.pop_os.mouseconfigurator");
     if let Err(err) = std::fs::create_dir_all(&dir) {
         panic!("Failed to create directory `{}`: {}", dir.display(), err);
     }
