@@ -22,7 +22,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-use hp_mouse_configurator::HpMouse;
+use mouse_configurator::HpMouse;
 
 pub struct DeviceMonitorProcess {
     sock: RawFd,
@@ -111,8 +111,8 @@ impl Iterator for DeviceMonitorProcess {
 }
 
 pub fn device_monitor_process() {
-    let current_devices = hp_mouse_configurator::enumerate().unwrap();
-    let monitor_devices = hp_mouse_configurator::monitor().unwrap();
+    let current_devices = mouse_configurator::enumerate().unwrap();
+    let monitor_devices = mouse_configurator::monitor().unwrap();
 
     while nix::unistd::write(libc::STDIN_FILENO, b"Started\n") == Err(Errno::EINTR) {}
 

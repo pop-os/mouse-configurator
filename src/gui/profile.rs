@@ -11,7 +11,7 @@ use super::{
     worker::{DeviceId, WorkerModel, WorkerMsg},
     AppModel,
 };
-use hp_mouse_configurator::{Button, PressType};
+use mouse_configurator::{Button, PressType};
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(untagged)]

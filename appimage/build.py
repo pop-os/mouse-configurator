@@ -15,8 +15,8 @@ args = parser.parse_args()
 
 # Appimage packaging
 # XXX name
-PKG = "hp-mouse-configurator"
-APPID = "com.hp.mouse-configurator"
+PKG = "mouse-configurator"
+APPID = "org.pop_os.mouseconfigurator"
 ARCH = "x86_64"
 
 # Executables to install

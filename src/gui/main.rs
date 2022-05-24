@@ -5,7 +5,7 @@ use relm4::{
 };
 use std::{collections::HashMap, env, path::PathBuf, process::Command};
 
-use hp_mouse_configurator::Event;
+use mouse_configurator::Event;
 
 mod bindings;
 use bindings::HardwareButton;
@@ -430,7 +430,7 @@ impl AppUpdate for AppModel {
 impl Widgets<AppModel, ()> for AppWidgets {
     view! {
         main_window = gtk4::ApplicationWindow {
-            set_title: Some("HP Mouse"),
+            set_title: Some("Mouse Configurator"),
             set_default_size: args!(1280, 768),
             set_titlebar = Some(&gtk4::HeaderBar) {
                 pack_start = &gtk4::Button {
@@ -933,11 +933,10 @@ fn main() {
         gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
 
-    // TODO
-    glib::set_prgname(Some("com.system76.mouseconfigurator"));
+    glib::set_prgname(Some("com.pop_os.mouseconfigurator"));
     glib::set_application_name("Mouse Configurator");
     let app = gtk4::Application::builder()
-        .application_id("com.system76.mouseconfigurator")
+        .application_id("com.pop_os.mouseconfigurator")
         .build();
     app.register(None::<&gio::Cancellable>).unwrap();
     let device_monitor = if !app.is_remote() {

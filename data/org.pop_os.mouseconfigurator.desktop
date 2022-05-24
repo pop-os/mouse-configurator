@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Mouse Configurator
+Exec=mouse-configurator
+Icon=org.pop_os.mouseconfigurator
+Type=Application
+StartupNotify=true
+Categories=Utility;

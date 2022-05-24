@@ -11,8 +11,8 @@ SRC = Cargo.toml Cargo.lock Makefile $(shell find src -type f -wholename '*src/*
 
 .PHONY: all clean distclean install uninstall update
 
-APPID = "com.hp.mouse-configurator"
-BIN=hp-mouse-configurator
+APPID = "org.pop_os.mouseconfigurator"
+BIN=mouse-configurator
 DESKTOP = $(APPID).desktop
 ICON = $(APPID).svg
 APPDATA = $(APPID).appdata.xml

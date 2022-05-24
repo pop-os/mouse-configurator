@@ -1,4 +1,4 @@
-Source: hp-mouse-configurator
+Source: mouse-configurator
 Section: admin
 Priority: optional
 Maintainer: System76 <info@system76.com>
@@ -9,11 +9,11 @@ Build-Depends:
   libudev-dev,
   pkg-config,
 Standards-Version: 4.1.1
-Homepage: https://github.com/pop-os/hp-mouse-configurator
+Homepage: https://github.com/pop-os/mouse-configurator
 
-Package: hp-mouse-configurator
+Package: mouse-configurator
 Architecture: amd64 arm64
 Depends:
   ${misc:Depends},
   ${shlibs:Depends}
-Description: HP mouse configurator
+Description: Mouse configurator

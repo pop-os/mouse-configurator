@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use hp_mouse_configurator::{enumerate, Event, HpMouse};
+use mouse_configurator::{enumerate, Event, HpMouse};
 
 fn hp_mouse(mouse: HpMouse) {
     println!("Found HP mouse");

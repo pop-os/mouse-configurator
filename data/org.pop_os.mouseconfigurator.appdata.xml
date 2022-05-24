@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-	<id>com.hp.mouse-configurator</id>
+	<id>org.pop_os.mouseconfigurator</id>
 	<metadata_license>CC0-1.0</metadata_license>
 	<project_license>MIT</project_license>
 	<developer_name>System76</developer_name>
 	<update_contact>info@system76.com</update_contact>
-	<url type="homepage">https://github.com/pop-os/hp-mouse-configurator</url>
-	<url type="bugtracker">https://github.com/pop-os/hp-mouse-configurator</url>
+	<url type="homepage">https://github.com/pop-os/mouse-configurator</url>
+	<url type="bugtracker">https://github.com/pop-os/mouse-configurator</url>
 	<name>Mouse Configurator</name>
 	<summary>Button assignment, quick and easy navigation, manage connections, sensitivity, battery status.</summary>
 	<description>
@@ -17,11 +17,11 @@
 	<categories>
 		<category>Utility</category>
 	</categories>
-	<launchable type="desktop-id">com.hp.mouse-configurator.desktop</launchable>
+	<launchable type="desktop-id">org.pop_os.mouseconfigurator.desktop</launchable>
 	<!-- TODO: screenshots -->
 	<project_group>Pop!_OS</project_group>
 	<provides>
-		<binary>hp-mouse-configurator</binary>
+		<binary>mouse-configurator</binary>
 	</provides>
 	<content_rating type="oars-1.0" />
 </component>

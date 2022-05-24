@@ -6,7 +6,7 @@ use serde::de::{self, Error};
 use std::collections::HashMap;
 
 use crate::keycode::*;
-use hp_mouse_configurator::{Op, Value::*};
+use mouse_configurator::{Op, Value::*};
 
 // TODO better naming? Important if serialized in json.
 #[repr(u8)]
@@ -463,7 +463,7 @@ impl Entry {
 
 #[cfg(test)]
 mod tests {
-    use hp_mouse_configurator::button::{decode_action, encode_action};
+    use mouse_configurator::button::{decode_action, encode_action};
 
     use super::*;
 
