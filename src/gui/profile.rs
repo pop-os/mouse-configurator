@@ -8,6 +8,7 @@ use std::{
 
 use super::{
     bindings::{Entry, HardwareButton, PresetBinding},
+    keycode,
     worker::{DeviceId, WorkerModel, WorkerMsg},
     AppModel,
 };
@@ -19,13 +20,23 @@ pub enum Binding {
     Preset(PresetBinding),
     // TODO Custom
     // Binding read from device, that isn't recognized
+    Custom(i8, i8), // TODO best way to serialize?
     Unknown,
+}
+
+fn custom_label(mods: i8, key: i8) -> Option<String> {
+    let mods = keycode::mask_to_modifier(mods);
+    let key = keycode::mouse_to_gdk_keycode(key)?;
+    Some(keycode::keycode_label(key, mods)?.into())
 }
 
 impl Binding {
     pub fn label(&self) -> String {
         match self {
             Binding::Preset(binding) => binding.entry().label.to_string(),
+            Binding::Custom(mods, key) => {
+                custom_label(*mods, *key).unwrap_or_else(|| "".to_string())
+            }
             Binding::Unknown => "Unknown".to_string(),
         }
     }
@@ -126,6 +137,7 @@ impl MouseState {
                 Ok(action) => {
                     if let Some(entry) = Entry::for_binding(&action) {
                         Binding::Preset(entry.id)
+                        // TODO Handle custom binding
                     } else {
                         eprintln!("Unrecognized action: {:?}", action);
                         Binding::Unknown
@@ -175,6 +187,10 @@ pub(super) fn apply_profile_diff(
                 }
                 let binding = match config_binding {
                     Some(Binding::Preset(preset)) => &preset.entry().binding,
+                    Some(Binding::Custom(mods, key)) => {
+                        continue;
+                    } // XXX
+                    // XXX also need to parse custom
                     Some(Binding::Unknown) => {
                         // Shouldn't occur
                         continue;

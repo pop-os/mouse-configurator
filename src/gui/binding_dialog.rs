@@ -1,24 +1,31 @@
-use gtk4::{glib, pango, prelude::*};
+use gtk4::{gdk, glib, pango, prelude::*};
 use relm4::{send, view, ComponentUpdate, Model, Sender, Widgets};
-use std::{cell::Cell, collections::HashMap, ptr, rc::Rc};
+use std::{cell::Cell, collections::HashMap, ptr, rc::Rc, time::Duration};
 
 use crate::{
     bindings::{Category, Entry, HardwareButton, BINDINGS},
+    keycode,
     profile::Binding,
     util, AppMsg,
 };
+
+pub enum Page {
+    CategoryList,
+    Category(&'static Category),
+    Custom,
+}
 
 pub enum BindingDialogMsg {
     Show(HardwareButton),
     #[allow(unused)]
     Hide,
-    SelectCategory(Option<&'static Category>),
+    SetPage(Page),
     Selected(&'static Entry),
 }
 
 pub struct BindingDialogModel {
     button_id: HardwareButton,
-    category: Option<&'static Category>,
+    page: Page,
     shown: bool,
 }
 
@@ -32,7 +39,7 @@ impl ComponentUpdate<super::AppModel> for BindingDialogModel {
     fn init_model(_parent_model: &super::AppModel) -> Self {
         BindingDialogModel {
             button_id: HardwareButton::Right,
-            category: None,
+            page: Page::CategoryList,
             shown: false,
         }
     }
@@ -47,14 +54,14 @@ impl ComponentUpdate<super::AppModel> for BindingDialogModel {
         match msg {
             BindingDialogMsg::Show(button_id) => {
                 self.button_id = button_id;
-                self.category = None;
+                self.page = Page::CategoryList;
                 self.shown = true;
             }
             BindingDialogMsg::Hide => {
                 self.shown = false;
             }
-            BindingDialogMsg::SelectCategory(category) => {
-                self.category = category;
+            BindingDialogMsg::SetPage(page) => {
+                self.page = page;
             }
             BindingDialogMsg::Selected(entry) => {
                 send!(
@@ -80,10 +87,10 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
             set_titlebar = Some(&gtk4::HeaderBar) {
                 pack_start = &gtk4::Button {
                     add_css_class: "flat",
-                    set_visible: watch!(model.category.is_some()),
+                    set_visible: watch!(!matches!(model.page, Page::CategoryList)),
                     set_icon_name: "go-previous-symbolic",
                     connect_clicked(sender) => move |_| {
-                        send!(sender, BindingDialogMsg::SelectCategory(None));
+                        send!(sender, BindingDialogMsg::SetPage(Page::CategoryList));
                     }
                 },
             },
@@ -103,15 +110,25 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
                         add_css_class: "frame",
                         set_header_func: util::header_func,
                         connect_row_activated(sender) => move |_, row| {
-                            let category = categories[row.index() as usize];
-                            send!(sender, BindingDialogMsg::SelectCategory(Some(category)));
+                            if row.index() as usize == categories.len() {
+                                send!(sender, BindingDialogMsg::SetPage(Page::Custom));
+                            } else {
+                                let category = categories[row.index() as usize];
+                                send!(sender, BindingDialogMsg::SetPage(Page::Category(category)));
+                            }
                         },
                     },
                     add_child: binding_vbox = &gtk4::Box {
                         set_orientation: gtk4::Orientation::Vertical,
                         set_spacing: 6,
                         append = &gtk4::Label {
-                            set_label: watch! { model.category.map_or("", |x| &x.label) }, // XXX translate
+                            set_label: watch! {
+                                if let Page::Category(category) = &model.page {
+                                    &category.label
+                                    } else {
+                                        ""
+                                    }
+                            }, // XXX translate
                             set_attributes = Some(&pango::AttrList) {
                                 insert: pango::AttrInt::new_weight(pango::Weight::Bold)
                             },
@@ -130,6 +147,25 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
 
                             },
                         },
+                    },
+                    add_child: custom_binding_box = &gtk4::Box {
+                        // TODO: inhibit_system_shortcuts
+                        //set_can_focus: true,
+                        set_orientation: gtk4::Orientation::Vertical,
+                        set_focusable: true,
+                        append = &gtk4::Label {
+                            set_label: "Press the key combination to set new shortcut"
+                        },
+                        append: shortcut_label = &gtk4::ShortcutLabel {
+                        },
+                        add_controller = &gtk4::EventControllerKey {
+                            connect_key_released(shortcut_label) => move |_, _keyval, keycode, state| {
+                                println!("keyval: {:?}", _keyval);
+
+                                let accelerator = keycode::keycode_accelerator(keycode, state);
+                                shortcut_label.set_accelerator(&accelerator.as_deref().unwrap_or(""));
+                            }
+                        },
                     }
                 }
             }
@@ -138,6 +174,7 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
 
     additional_fields! {
         category: Rc<Cell<&'static Category>>,
+        inhibit_source: Option<glib::SourceId>,
     }
 
     fn pre_init() {
@@ -152,6 +189,7 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
         let rows = Rc::new(rows);
 
         let category = Rc::new(Cell::new(&BINDINGS[0]));
+        let inhibit_source = None;
     }
 
     fn post_init() {
@@ -213,6 +251,29 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
             }
         }
 
+        view! {
+            custom_row = gtk4::ListBoxRow {
+                set_selectable: false,
+                set_child: hbox = Some(&gtk4::Box) {
+                    set_margin_top: 6,
+                    set_margin_bottom: 6,
+                    set_margin_start: 6,
+                    set_margin_end: 6,
+                    set_spacing: 12,
+                    set_orientation: gtk4::Orientation::Horizontal,
+                    append = &gtk4::Label {
+                        set_label: "Custom Shortcut", // TODO Translate?
+                    },
+                    append = &gtk4::Image {
+                        set_hexpand: true,
+                        set_halign: gtk4::Align::End,
+                        set_icon_name: Some("go-next-symbolic"),
+                    }
+                }
+            }
+        }
+        category_list_box.append(&custom_row);
+
         // Avoid transition on reopening
         dialog.connect_visible_notify(
             glib::clone!(@strong stack, @strong category_list_box => move |dialog| {
@@ -226,14 +287,39 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
     }
 
     fn post_view() {
-        if let Some(category) = model.category.as_ref() {
-            self.stack.set_visible_child(&self.binding_vbox);
-            if !ptr::eq(self.category.get(), *category) {
-                self.category.set(*category);
-                self.binding_list_box.invalidate_filter();
+        match &model.page {
+            Page::CategoryList => {
+                self.stack.set_visible_child(&self.category_list_box);
             }
-        } else {
-            self.stack.set_visible_child(&self.category_list_box);
+            Page::Category(category) => {
+                self.stack.set_visible_child(&self.binding_vbox);
+                if !ptr::eq(self.category.get(), *category) {
+                    self.category.set(*category);
+                    self.binding_list_box.invalidate_filter();
+                }
+            }
+            Page::Custom => {
+                self.stack.set_visible_child(&self.custom_binding_box);
+                println!("{}", self.custom_binding_box.grab_focus());
+                // XXX
+            }
+        }
+
+        // Inhibit system shorcuts if on `Custom` page
+        let surface = self.dialog.surface().downcast::<gdk::Toplevel>().unwrap();
+        if !matches!(model.page, Page::Custom) {
+            if let Some(inhibit_source) = self.inhibit_source.take() {
+                inhibit_source.remove();
+                surface.restore_system_shortcuts();
+            }
+        } else if self.inhibit_source.is_none() {
+            self.inhibit_source = Some(glib::timeout_add_local(
+                Duration::from_millis(100),
+                move || {
+                    surface.inhibit_system_shortcuts(None::<&gdk::Event>);
+                    Continue(true)
+                },
+            ));
         }
     }
 }
