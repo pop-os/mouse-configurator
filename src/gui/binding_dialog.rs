@@ -21,12 +21,14 @@ pub enum BindingDialogMsg {
     Hide,
     SetPage(Page),
     Selected(&'static Entry),
+    SetCustomBinding(Option<(i8, i8)>),
 }
 
 pub struct BindingDialogModel {
     button_id: HardwareButton,
     page: Page,
     shown: bool,
+    custom_binding: Option<(i8, i8)>,
 }
 
 impl Model for BindingDialogModel {
@@ -41,6 +43,7 @@ impl ComponentUpdate<super::AppModel> for BindingDialogModel {
             button_id: HardwareButton::Right,
             page: Page::CategoryList,
             shown: false,
+            custom_binding: None,
         }
     }
 
@@ -62,6 +65,7 @@ impl ComponentUpdate<super::AppModel> for BindingDialogModel {
             }
             BindingDialogMsg::SetPage(page) => {
                 self.page = page;
+                self.custom_binding = None;
             }
             BindingDialogMsg::Selected(entry) => {
                 send!(
@@ -69,6 +73,9 @@ impl ComponentUpdate<super::AppModel> for BindingDialogModel {
                     AppMsg::SetBinding(self.button_id, Binding::Preset(entry.id))
                 );
                 self.shown = false;
+            }
+            BindingDialogMsg::SetCustomBinding(binding) => {
+                self.custom_binding = binding;
             }
         }
     }
@@ -141,32 +148,49 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
                                 let row_category = rows[row.index() as usize].0;
                                 ptr::eq(row_category, category.get())
                             },
-                            connect_row_activated(rows) => move |_, row| {
+                            connect_row_activated(rows, sender) => move |_, row| {
                                 let entry = rows[row.index() as usize].1;
                                 send!(sender, BindingDialogMsg::Selected(entry));
 
                             },
                         },
                     },
-                    add_child: custom_binding_box = &gtk4::Box {
-                        // TODO: inhibit_system_shortcuts
-                        //set_can_focus: true,
-                        set_orientation: gtk4::Orientation::Vertical,
-                        set_focusable: true,
-                        append = &gtk4::Label {
-                            set_label: "Press the key combination to set new shortcut"
-                        },
-                        append: shortcut_label = &gtk4::ShortcutLabel {
-                        },
-                        add_controller = &gtk4::EventControllerKey {
-                            connect_key_released(shortcut_label) => move |_, _keyval, keycode, state| {
-                                println!("keyval: {:?}", _keyval);
+                    add_child: custom_binding_stack = &gtk4::Stack {
+                        add_child: custom_binding_box = &gtk4::Box {
+                            set_orientation: gtk4::Orientation::Vertical,
+                            set_focusable: true,
+                            append = &gtk4::Label {
+                                set_label: "Press the key combination to set new shortcut"
+                            },
+                            add_controller = &gtk4::EventControllerKey {
+                                connect_key_released(sender, shortcut_label) => move |_, _keyval, keycode, state| {
+                                    println!("keyval: {:?}", _keyval);
 
-                                let accelerator = keycode::keycode_accelerator(keycode, state);
-                                shortcut_label.set_accelerator(&accelerator.as_deref().unwrap_or(""));
-                            }
+                                    // Only set if recongized
+
+                                    let accelerator = keycode::keycode_accelerator(keycode, state);
+                                    shortcut_label.set_accelerator(&accelerator.as_deref().unwrap_or(""));
+
+                                    let binding = Some((0, 0)); // XXX
+                                    send!(sender, BindingDialogMsg::SetCustomBinding(binding));
+                                }
+                            },
                         },
-                    }
+                        add_child: custom_binding_set_box = &gtk4::Box {
+                            set_orientation: gtk4::Orientation::Vertical,
+                            append = &gtk4::Label {
+                                set_label: "New Custom Shortcut"
+                            },
+                            append: shortcut_label = &gtk4::ShortcutLabel {
+                            },
+                            append = &gtk4::Button {
+                                set_label: "Save",
+                                connect_clicked(sender) => move |_| {
+                                    // TODO
+                                }
+                            }
+                        }
+                    },
                 }
             }
         }
@@ -299,15 +323,22 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
                 }
             }
             Page::Custom => {
-                self.stack.set_visible_child(&self.custom_binding_box);
-                println!("{}", self.custom_binding_box.grab_focus());
-                // XXX
+                self.stack.set_visible_child(&self.custom_binding_stack);
+                if model.custom_binding.is_none() {
+                    self.custom_binding_stack
+                        .set_visible_child(&self.custom_binding_box);
+                    println!("{}", self.custom_binding_box.grab_focus());
+                } else {
+                    self.custom_binding_stack
+                        .set_visible_child(&self.custom_binding_set_box);
+                }
             }
         }
 
         // Inhibit system shorcuts if on `Custom` page
         let surface = self.dialog.surface().downcast::<gdk::Toplevel>().unwrap();
-        if !matches!(model.page, Page::Custom) {
+        let should_inhibit = matches!(model.page, Page::Custom) && model.custom_binding.is_none();
+        if !should_inhibit {
             if let Some(inhibit_source) = self.inhibit_source.take() {
                 inhibit_source.remove();
                 surface.restore_system_shortcuts();
