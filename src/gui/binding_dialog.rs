@@ -79,10 +79,10 @@ impl ComponentUpdate<super::AppModel> for BindingDialogModel {
                 self.custom_binding = binding;
             }
             BindingDialogMsg::SaveCustom => {
-                if let Some((mod_, key)) = self.custom_binding {
+                if let Some((mods, key)) = self.custom_binding {
                     send!(
                         parent_sender,
-                        AppMsg::SetBinding(self.button_id, Binding::Custom(mod_, key))
+                        AppMsg::SetBinding(self.button_id, Binding::Custom(mods, key))
                     );
                     self.shown = false;
                 }
@@ -182,8 +182,8 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
                                     shortcut_label.set_accelerator(&accelerator.as_deref().unwrap_or(""));
 
                                     if let Some(keycode) = keycode::gdk_to_mouse_keycode(keycode) {
-                                        let mod_ = keycode::modifier_to_mask(state);
-                                        send!(sender, BindingDialogMsg::SetCustomBinding(Some((mod_, keycode))));
+                                        let mods = keycode::modifier_to_mask(state);
+                                        send!(sender, BindingDialogMsg::SetCustomBinding(Some((mods, keycode))));
                                     }
                                 }
                             },

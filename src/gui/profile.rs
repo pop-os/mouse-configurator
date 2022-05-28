@@ -125,8 +125,8 @@ fn recognize_binding(action: &[Op]) -> Binding {
         ref payload,
     }] = &action[..]
     {
-        if let [Const(mod_), Const(key)] = &payload[..] {
-            return Binding::Custom(*mod_, *key);
+        if let [Const(mods), Const(key)] = &payload[..] {
+            return Binding::Custom(*mods, *key);
         }
     }
     eprintln!("Unrecognized action: {:?}", action);
