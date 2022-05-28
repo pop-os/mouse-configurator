@@ -22,6 +22,7 @@ pub enum BindingDialogMsg {
     SetPage(Page),
     Selected(&'static Entry),
     SetCustomBinding(Option<(i8, i8)>),
+    SaveCustom,
 }
 
 pub struct BindingDialogModel {
@@ -76,6 +77,15 @@ impl ComponentUpdate<super::AppModel> for BindingDialogModel {
             }
             BindingDialogMsg::SetCustomBinding(binding) => {
                 self.custom_binding = binding;
+            }
+            BindingDialogMsg::SaveCustom => {
+                if let Some((mod_, key)) = self.custom_binding {
+                    send!(
+                        parent_sender,
+                        AppMsg::SetBinding(self.button_id, Binding::Custom(mod_, key))
+                    );
+                    self.shown = false;
+                }
             }
         }
     }
@@ -171,8 +181,10 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
                                     let accelerator = keycode::keycode_accelerator(keycode, state);
                                     shortcut_label.set_accelerator(&accelerator.as_deref().unwrap_or(""));
 
-                                    let binding = Some((0, 0)); // XXX
-                                    send!(sender, BindingDialogMsg::SetCustomBinding(binding));
+                                    if let Some(keycode) = keycode::gdk_to_mouse_keycode(keycode) {
+                                        let mod_ = keycode::modifier_to_mask(state);
+                                        send!(sender, BindingDialogMsg::SetCustomBinding(Some((mod_, keycode))));
+                                    }
                                 }
                             },
                         },
@@ -186,7 +198,7 @@ impl Widgets<BindingDialogModel, super::AppModel> for BindingDialogWidgets {
                             append = &gtk4::Button {
                                 set_label: "Save",
                                 connect_clicked(sender) => move |_| {
-                                    // TODO
+                                    send!(sender, BindingDialogMsg::SaveCustom)
                                 }
                             }
                         }
