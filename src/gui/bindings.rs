@@ -318,7 +318,7 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                 },
                 Entry {
                     id: Home,
-                    label: "New Window",
+                    label: "Home",
                     binding: vec![Op::key(true, vec![Const(MOD_Alt), Const(KEY_Home)])],
                     keybind: Some("Alt+Home"),
                 },
