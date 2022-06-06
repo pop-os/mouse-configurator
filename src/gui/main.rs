@@ -542,6 +542,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                     // set_show_arrow: false, XXX requires GTK 4.6?
                                 },
                                 add_child: profiles_entry = &gtk4::Entry {
+                                    set_max_length: 30,
                                     connect_activate(sender) => move |_| {
                                         send!(sender, AppMsg::ToggleRenameConfig);
                                     }
