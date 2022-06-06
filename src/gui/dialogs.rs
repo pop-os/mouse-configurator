@@ -33,6 +33,7 @@ pub fn show_info_dialog(
     view! {
         dialog = gtk4::Dialog {
             set_transient_for: Some(main_window),
+            set_modal: true,
             set_title: Some("About This Mouse"),
             set_child = Some(&gtk4::ListBox) {
                 set_margin_start: 12,
