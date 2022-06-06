@@ -2,21 +2,24 @@ use gtk4::{glib, prelude::*, subclass::prelude::*};
 
 use crate::HardwareButton;
 
+const SVG_WIDTH: f64 = 474.;
+const SVG_HEIGHT: f64 = 347.;
+
 pub const IMAGE_WIDTH: i32 = 512;
-const IMAGE_RATIO: f64 = 347. / 474.; // Height/width
+const IMAGE_RATIO: f64 = SVG_HEIGHT / SVG_WIDTH;
 pub static BUTTONS: &[(f64, f64, bool, Option<HardwareButton>)] = &[
     // Middle click
-    (0.9, 0.05, true, Some(HardwareButton::Middle)),
+    (426.6, 17.35, true, Some(HardwareButton::Middle)),
     // Left and right click (swapped in left handed mode)
-    (0.085, 0.185, false, None),
-    (0.998, 0.185, true, Some(HardwareButton::Right)),
+    (40.29, 64.195, false, None),
+    (473.052, 64.195, true, Some(HardwareButton::Right)),
     // Scroll buttons
-    (0.1, 0.279, false, Some(HardwareButton::ScrollLeft)),
-    (0.985, 0.279, true, Some(HardwareButton::ScrollRight)),
+    (47.4, 96.813, false, Some(HardwareButton::ScrollLeft)),
+    (466.89, 96.813, true, Some(HardwareButton::ScrollRight)),
     // Side buttons
-    (0.0, 0.51, false, Some(HardwareButton::LeftTop)),
-    (0.0, 0.597, false, Some(HardwareButton::LeftCenter)),
-    (0.0, 0.68, false, Some(HardwareButton::LeftBottom)),
+    (0.0, 176.97, false, Some(HardwareButton::LeftTop)),
+    (0.0, 207.159, false, Some(HardwareButton::LeftCenter)),
+    (0.0, 235.96, false, Some(HardwareButton::LeftBottom)),
 ];
 
 #[derive(Default)]
@@ -57,7 +60,7 @@ impl ButtonsWidget {
             Some(button),
             gtk4::ConstraintAttribute::Bottom,
             gtk4::ConstraintRelation::Eq,
-            y * h,
+            y * h / SVG_HEIGHT,
             0,
         ));
         let side = if right {
@@ -69,7 +72,7 @@ impl ButtonsWidget {
             Some(button),
             side,
             gtk4::ConstraintRelation::Eq,
-            x * w,
+            x * w / SVG_WIDTH,
             0,
         ));
     }
