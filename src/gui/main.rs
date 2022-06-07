@@ -827,7 +827,7 @@ impl Widgets<AppModel, ()> for AppWidgets {
                                 set_label: "HP 930 series Creator Wireless Mouse" // TODO don't hard-code
                             },
                             append = &gtk4::Label {
-                                set_label: &format!("Serial: {}", device.serial )
+                                set_label: &format!("Unique ID: {}", device.serial )
                             }
                         }
                     }

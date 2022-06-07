@@ -94,7 +94,7 @@ pub fn show_info_dialog(
                         set_spacing: 12,
                         set_orientation: gtk4::Orientation::Horizontal,
                         append = &gtk4::Label {
-                            set_label: "Serial Number"
+                            set_label: "Unique ID"
                         },
                         append = &gtk4::Label {
                             set_label: serial,
