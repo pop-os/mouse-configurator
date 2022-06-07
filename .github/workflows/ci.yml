@@ -4,14 +4,26 @@ on:
 
 name: ci
 
+env:
+  DEBIAN_FRONTEND: noninteractive
+
 jobs:
   run-tests:
     runs-on: ubuntu-latest
     container:
       image: ubuntu:latest
     steps:
-    - run: apt-get update && apt-get install -y curl libgtk-4-dev libudev-dev
-    - uses: actions/checkout@v2
-    - uses: actions-rs/toolchain@v1
-    - run: cargo test --all
-    - run: cargo fmt -- --check
+      - run: apt-get update && apt-get install -y curl libgtk-4-dev libudev-dev
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+      - run: cargo test --all
+      - run: cargo fmt -- --check
+  appimage:
+    runs-on: ubuntu-18.04
+    container:
+      image: ubuntu:impish
+    steps:
+      - run: apt-get update && apt-get install -y curl fuse libfuse2 libgtk-4-dev libudev-dev python3
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+      - run: cd appimage && ./build.py --release
