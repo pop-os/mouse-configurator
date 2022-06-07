@@ -119,7 +119,6 @@ pub enum PresetBinding {
     MoveToWorkspaceAbove,
     WorkspacesOverview,
     ToggleFullscreen,
-    Restart,
     LogOut,
     LockScreen,
     Super,
@@ -377,12 +376,6 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                     label: "Toggle Fullscreen",
                     binding: vec![Op::key(true, vec![Const(0), Const(KEY_F11)])],
                     keybind: Some("F11"),
-                },
-                Entry {
-                    id: Restart,
-                    label: "Restart",
-                    binding: vec![Op::media(true, vec![Const(MEDIA_Restart)])],
-                    keybind: None,
                 },
                 Entry {
                     id: LogOut,
