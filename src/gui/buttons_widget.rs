@@ -9,17 +9,17 @@ pub const IMAGE_WIDTH: i32 = 512;
 const IMAGE_RATIO: f64 = SVG_HEIGHT / SVG_WIDTH;
 pub static BUTTONS: &[(f64, f64, bool, Option<HardwareButton>)] = &[
     // Middle click
-    (426.6, 17.35, true, Some(HardwareButton::Middle)),
+    (342., 17., true, Some(HardwareButton::Middle)),
     // Left and right click (swapped in left handed mode)
-    (40.29, 64.195, false, None),
-    (473.052, 64.195, true, Some(HardwareButton::Right)),
+    (121., 64., false, None),
+    (392., 64., true, Some(HardwareButton::Right)),
     // Scroll buttons
-    (47.4, 96.813, false, Some(HardwareButton::ScrollLeft)),
-    (466.89, 96.813, true, Some(HardwareButton::ScrollRight)),
+    (121., 97., false, Some(HardwareButton::ScrollLeft)),
+    (392., 97., true, Some(HardwareButton::ScrollRight)),
     // Side buttons
-    (0.0, 176.97, false, Some(HardwareButton::LeftTop)),
-    (0.0, 207.159, false, Some(HardwareButton::LeftCenter)),
-    (0.0, 235.96, false, Some(HardwareButton::LeftBottom)),
+    (89., 178., false, Some(HardwareButton::LeftTop)),
+    (89., 207., false, Some(HardwareButton::LeftCenter)),
+    (89., 236., false, Some(HardwareButton::LeftBottom)),
 ];
 
 #[derive(Default)]
@@ -58,15 +58,15 @@ impl ButtonsWidget {
         button.set_parent(self);
         layout_manager.add_constraint(&gtk4::Constraint::new_constant(
             Some(button),
-            gtk4::ConstraintAttribute::Bottom,
+            gtk4::ConstraintAttribute::CenterY,
             gtk4::ConstraintRelation::Eq,
             y * h / SVG_HEIGHT,
             0,
         ));
         let side = if right {
-            gtk4::ConstraintAttribute::Right
-        } else {
             gtk4::ConstraintAttribute::Left
+        } else {
+            gtk4::ConstraintAttribute::Right
         };
         layout_manager.add_constraint(&gtk4::Constraint::new_constant(
             Some(button),
