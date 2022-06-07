@@ -687,6 +687,8 @@ impl Widgets<AppModel, ()> for AppWidgets {
         for (x, y, right, id) in BUTTONS {
             view! {
                button = &gtk4::Button {
+                    set_margin_start: 8,
+                    set_margin_end: 8,
                     set_label: "Unknown",
                     add_css_class: "mouse-button",
                     add_css_class: "flat",
