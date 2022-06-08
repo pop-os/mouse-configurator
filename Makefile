@@ -16,6 +16,7 @@ BIN=mouse-configurator
 DESKTOP = $(APPID).desktop
 ICON = $(APPID).svg
 APPDATA = $(APPID).appdata.xml
+POLICY = org.pop_os.pkexec.mouseconfigurator.policy
 
 TARGET = debug
 DEBUG ?= 0
@@ -42,12 +43,14 @@ install: all
 	install -Dm0644 "data/$(DESKTOP)" "$(DESTDIR)$(datadir)/applications/$(DESKTOP)"
 	install -Dm0644 "data/$(ICON)" "$(DESTDIR)$(datadir)/icons/hicolor/scalable/apps/$(ICON)"
 	install -Dm0644 "data/$(APPDATA)" "$(DESTDIR)$(datadir)/metainfo/$(APPDATA)"
+	install -Dm0644 "data/$(POLICY)" "$(DESTDIR)$(datadir)/polkit-1/actions/$(POLICY)"
 
 uninstall:
 	rm -f "$(DESTDIR)$(bindir)/$(BIN)"
 	rm -f "$(DESTDIR)$(datadir)/applications/$(DESKTOP)"
 	rm -f "$(DESTDIR)$(datadir)/icons/hicolor/scalable/apps/$(ICON)"
 	rm -f "$(DESTDIR)$(datadir)/metainfo/$(APPDATA)"
+	rm -f "$(DESTDIR)$(datadir)/polkit-1/actions/$(POLICY)"
 
 update:
 	cargo update
