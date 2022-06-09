@@ -1,3 +1,9 @@
+mouse-configurator (1.0.0) jammy; urgency=medium
+
+  * Stable release.
+
+ -- Ian Douglas Scott <idscott@system76.com>  Thu, 09 Jun 2022 09:18:31 -0700
+
 mouse-configurator (0.1.0) jammy; urgency=medium
 
   * Initial release.
