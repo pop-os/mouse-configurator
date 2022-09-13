@@ -337,7 +337,7 @@ pub static BINDINGS: Lazy<Vec<Category>> = Lazy::new(|| {
                     keybind: Some("Ctrl +"),
                 },
                 Entry {
-                    id: ZoomIn,
+                    id: ZoomOut,
                     label: "Zoom Out",
                     binding: vec![Op::key(true, vec![Const(MOD_Ctrl), Const(KEY_Minus)])],
                     keybind: Some("Ctrl -"),
