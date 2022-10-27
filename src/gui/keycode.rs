@@ -1,5 +1,12 @@
 #![allow(unused, non_upper_case_globals, overflowing_literals)]
 
+use crate::keycode;
+use gtk4::{
+    gdk,
+    glib::{self, translate::IntoGlib},
+    prelude::*,
+};
+
 // Matches /sys/kernel/debug/hid/*/rdesc
 
 pub const MOD_Ctrl: i8 = 1 << 0;
@@ -110,3 +117,55 @@ pub const MEDIA_VolumeUp: i8 = 0xE9;
 pub const MEDIA_VolumeDown: i8 = 0xEA;
 
 // TODO: Other supported codes, as needed
+
+static KEYCODE_MAP: &[(u32, i8)] = &[];
+
+pub fn modifier_to_mask(state: gdk::ModifierType) -> i8 {
+    use keycode::*;
+
+    MOD_Ctrl * (state.contains(gdk::ModifierType::CONTROL_MASK) as i8)
+        | MOD_Shift * (state.contains(gdk::ModifierType::SHIFT_MASK) as i8)
+        | MOD_Alt * (state.contains(gdk::ModifierType::ALT_MASK) as i8)
+        | MOD_Super * (state.contains(gdk::ModifierType::SUPER_MASK) as i8)
+}
+
+pub fn mask_to_modifier(mask: i8) -> gdk::ModifierType {
+    use keycode::*;
+
+    let mut modifier = gdk::ModifierType::empty();
+    modifier.set(gdk::ModifierType::CONTROL_MASK, mask & MOD_Ctrl != 0);
+    modifier.set(gdk::ModifierType::SHIFT_MASK, mask & MOD_Shift != 0);
+    modifier.set(gdk::ModifierType::ALT_MASK, mask & MOD_Alt != 0);
+    modifier.set(gdk::ModifierType::SUPER_MASK, mask & MOD_Super != 0);
+    modifier
+}
+
+pub fn mouse_to_gdk_keycode(keycode: i8) -> Option<u32> {
+    Some(KEYCODE_MAP.iter().find(|(_, x)| *x == keycode)?.0)
+}
+
+pub fn gdk_to_mouse_keycode(keycode: u32) -> Option<i8> {
+    Some(KEYCODE_MAP.iter().find(|(x, _)| *x == keycode)?.1)
+}
+
+pub fn keycode_to_keyval(keycode: u32, state: gdk::ModifierType) -> Option<gdk::Key> {
+    let level = state.contains(gdk::ModifierType::SHIFT_MASK) as i32;
+    let display = gdk::Display::default().unwrap();
+    let mappings = display.map_keycode(keycode)?;
+    Some(
+        mappings
+            .iter()
+            .find(|(x, _)| x.group() == 0 && x.level() == level)?
+            .1,
+    )
+}
+
+pub fn keycode_label(keycode: u32, state: gdk::ModifierType) -> Option<glib::GString> {
+    let keyval = keycode_to_keyval(keycode, state)?;
+    Some(gtk4::accelerator_get_label(keyval.into_glib(), state))
+}
+
+pub fn keycode_accelerator(keycode: u32, state: gdk::ModifierType) -> Option<glib::GString> {
+    let keyval = keycode_to_keyval(keycode, state)?;
+    Some(gtk4::accelerator_name(keyval.into_glib(), state))
+}

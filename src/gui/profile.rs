@@ -8,24 +8,34 @@ use std::{
 
 use super::{
     bindings::{Entry, HardwareButton, PresetBinding},
+    keycode,
     worker::{DeviceId, WorkerModel, WorkerMsg},
     AppModel,
 };
-use mouse_configurator::{Button, PressType};
+use mouse_configurator::{Button, Op, PressType, Value::Const};
 
 #[derive(Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum Binding {
     Preset(PresetBinding),
-    // TODO Custom
     // Binding read from device, that isn't recognized
+    Custom(i8, i8), // TODO best way to serialize?
     Unknown,
+}
+
+fn custom_label(mods: i8, key: i8) -> Option<String> {
+    let mods = keycode::mask_to_modifier(mods);
+    let key = keycode::mouse_to_gdk_keycode(key)?;
+    Some(keycode::keycode_label(key, mods)?.into())
 }
 
 impl Binding {
     pub fn label(&self) -> String {
         match self {
             Binding::Preset(binding) => binding.entry().label.to_string(),
+            Binding::Custom(mods, key) => {
+                custom_label(*mods, *key).unwrap_or_else(|| "".to_string())
+            }
             Binding::Unknown => "Unknown".to_string(),
         }
     }
@@ -107,6 +117,22 @@ pub struct MouseState {
     pub firmware_version: Option<(u16, u16, u16)>,
 }
 
+fn recognize_binding(action: &[Op]) -> Binding {
+    if let Some(entry) = Entry::for_binding(&action) {
+        return Binding::Preset(entry.id);
+    } else if let &[Op::Key {
+        auto_release: true,
+        ref payload,
+    }] = &action[..]
+    {
+        if let [Const(mods), Const(key)] = &payload[..] {
+            return Binding::Custom(*mods, *key);
+        }
+    }
+    eprintln!("Unrecognized action: {:?}", action);
+    Binding::Unknown
+}
+
 impl MouseState {
     pub fn set_bindings_from_buttons(&mut self, host_id: u8, buttons: &[Button]) {
         let mut bindings = HashMap::new();
@@ -123,14 +149,7 @@ impl MouseState {
                 }
             };
             let binding = match button.decode_action() {
-                Ok(action) => {
-                    if let Some(entry) = Entry::for_binding(&action) {
-                        Binding::Preset(entry.id)
-                    } else {
-                        eprintln!("Unrecognized action: {:?}", action);
-                        Binding::Unknown
-                    }
-                }
+                Ok(action) => recognize_binding(&action),
                 Err(err) => {
                     eprintln!("Unable to decode button action: {}", err);
                     Binding::Unknown
@@ -173,16 +192,21 @@ pub(super) fn apply_profile_diff(
                 } else {
                     state_bindings.remove(&i);
                 }
-                let binding = match config_binding {
-                    Some(Binding::Preset(preset)) => &preset.entry().binding,
-                    Some(Binding::Unknown) => {
-                        // Shouldn't occur
-                        continue;
-                    }
-                    None => &[] as &[_],
+
+                let set_binding = |binding| {
+                    let button = Button::new(i as u8, 0, PressType::Normal, binding);
+                    send!(worker, WorkerMsg::SetBinding(device_id.clone(), button))
                 };
-                let button = Button::new(i as u8, 0, PressType::Normal, binding); // XXX
-                send!(worker, WorkerMsg::SetBinding(device_id.clone(), button));
+
+                match config_binding {
+                    Some(Binding::Preset(preset)) => set_binding(&preset.entry().binding),
+                    Some(Binding::Custom(mods, key)) => set_binding(&[Op::Key {
+                        auto_release: true,
+                        payload: vec![Const(*mods), Const(*key)],
+                    }]),
+                    Some(Binding::Unknown) => unreachable!(), // Shouldn't occur
+                    None => set_binding(&[]),
+                }
             }
         }
     }
@@ -221,6 +245,7 @@ fn app_data_dir() -> PathBuf {
 
 // TODO: format? Multiple files?
 // XXX error handling? Don't run `app_data_dir` every save?
+// TODO map custom binding to preset if it matches?
 pub fn load_config() -> HashMap<String, MouseConfig> {
     let mut path = app_data_dir();
     path.push("config.json");
